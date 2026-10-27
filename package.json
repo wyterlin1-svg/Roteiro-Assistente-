@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
     "roteiro": "node --env-file-if-exists=.env cli.js",
-    "test": "node --test"
+    "test": "node --test",
+    "usuarios": "node --env-file-if-exists=.env usuarios.js"
   },
   "repository": {
     "type": "git",

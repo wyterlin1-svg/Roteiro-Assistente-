@@ -24,17 +24,24 @@ IA que cria roteiros de Reels do Instagram de até 40 segundos, escritos a parti
 - Cache de prompt no prompt do sistema, esforço de raciocínio `low` por padrão e custo de cada roteiro mostrado na tela.
 - O modelo é configurável: `claude-opus-5-5` (padrão, melhor escrita) ou `claude-haiku-5-5` (cerca de 40x mais barato).
 
-## Como usar
+## Acesso por login (para vender a clientes)
+
+Cada cliente entra com e-mail e senha. Você administra tudo em `/admin`: cria acessos (com a mensagem pronta para enviar ao cliente), bloqueia, gera nova senha e define quantos roteiros por mês cada um pode gerar. A chave da API fica só no seu servidor.
+
+**Para instalar no seu servidor, siga o [INSTALAR.md](INSTALAR.md)** (Docker ou Node, com HTTPS).
+
+## Rodar no seu computador
 
 Requer Node.js 22 ou superior.
 
 ```bash
 npm install
-cp .env.example .env        # coloque sua ANTHROPIC_API_KEY
-npm start                   # abre em http://localhost:3000
+cp .env.example .env                                   # coloque sua ANTHROPIC_API_KEY
+npm run usuarios -- admin voce@email.com SuaSenha123   # cria seu acesso
+npm start                                              # abre em http://localhost:3000
 ```
 
-Sem chave? Clique em **"Veja um exemplo"** na página para conhecer a interface e o teleprompter.
+Depois de entrar, clique em **"Veja um roteiro de exemplo"** para conhecer a interface e o teleprompter sem gastar nada.
 
 Pelo terminal:
 
@@ -49,9 +56,14 @@ Testes: `npm test`
 ## Estrutura
 
 ```
-server.js               servidor HTTP (node:http) + API
+server.js               servidor HTTP (node:http) + API + login
 cli.js                  versão de terminal
+usuarios.js             gerenciar acessos pelo terminal
 public/index.html       interface e teleprompter (um arquivo, sem build)
+public/login.html       tela de login
+public/admin.html       painel de clientes
+src/contas/             usuários (arquivo JSON), senhas e sessões
+Dockerfile, docker-compose.yml  instalação no servidor
 src/motor/prompt.js     o "cérebro": regras do algoritmo + schema da resposta
 src/motor/colisao.js    dado da colisão criativa (determinístico por semente)
 src/motor/viralometro.js auditoria local dos roteiros
@@ -59,7 +71,7 @@ src/motor/gerar.js      chamada à IA + reescrita automática
 src/exemplo.json        roteiro de exemplo (nota 100)
 ```
 
-## API
+## API (requer login)
 
 `POST /api/roteiro` com `{ "nicho": "...", "tema": "", "publico": "", "tom": "", "duracao": 30, "semente": "K7P2Q" }`. Só `nicho` é obrigatório; sem `tema`, entra no modo sem ideia.
 

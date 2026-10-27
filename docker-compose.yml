@@ -1,0 +1,9 @@
+services:
+  roteirista:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:3000:3000"   # só acessível pelo proxy (nginx/caddy) do próprio servidor
+    volumes:
+      - ./data:/app/data        # usuários e segredo da sessão: faça backup desta pasta

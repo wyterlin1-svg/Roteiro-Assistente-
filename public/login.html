@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar · Roteirista 40s</title>
+<style>
+  :root { --bg: #f6f4ef; --card: #fff; --ink: #17151a; --muted: #6b6672; --line: #e4e0d8; --accent: #ff3d6e; --bad: #d83a3a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f0e12; --card: #18161d; --ink: #f3f1f5; --muted: #9a94a3; --line: #2a2731; --bad: #ff6b6b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; }
+  form { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 28px 22px; }
+  h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  p { color: var(--muted); margin: 4px 0 18px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  input { width: 100%; padding: 13px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  button { width: 100%; margin-top: 20px; padding: 14px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: .6; }
+  .erro { color: var(--bad); font-size: 14px; min-height: 1.5em; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<form id="f">
+  <h1>Roteirista <span>40s</span></h1>
+  <p>Entre com o acesso que você recebeu.</p>
+  <label for="email">E-mail</label>
+  <input id="email" type="email" autocomplete="username" required autofocus>
+  <label for="senha">Senha</label>
+  <input id="senha" type="password" autocomplete="current-password" required>
+  <button id="b">Entrar</button>
+  <p class="erro" id="erro"></p>
+</form>
+<script>
+document.getElementById('f').onsubmit = async (e) => {
+  e.preventDefault();
+  const b = document.getElementById('b'), erro = document.getElementById('erro');
+  b.disabled = true; erro.textContent = '';
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: email.value, senha: senha.value }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.erro);
+    location.href = '/';
+  } catch (err) { erro.textContent = err.message; b.disabled = false; }
+};
+</script>
+</body>
+</html>

@@ -53,6 +53,9 @@
   .timeline i:nth-child(odd) { opacity: .7; }
   .hist button { display: block; width: 100%; text-align: left; margin-top: 6px; font-size: 14px; }
   .erro { color: var(--bad); }
+  .topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+  .topo a { color: var(--ink); text-decoration: none; margin-left: 12px; }
+  .cota { background: var(--chip); padding: 4px 10px; border-radius: 99px; }
   .vazio { color: var(--muted); font-size: 14px; }
   pre { white-space: pre-wrap; font: inherit; margin: 0; }
   /* Teleprompter */
@@ -73,6 +76,10 @@
 </head>
 <body>
 <main>
+  <nav class="topo">
+    <span>👤 <b id="quem"></b> <span class="cota" id="cota"></span></span>
+    <span><a href="/admin" id="linkAdmin" hidden>Clientes</a><a href="#" id="trocarSenha">Trocar senha</a><a href="#" id="sair">Sair</a></span>
+  </nav>
   <h1>Roteirista <span>40s</span></h1>
   <p class="sub">Roteiros de Reels guiados pelos sinais do algoritmo: retenção, replay, envios e salvamentos.</p>
 
@@ -104,7 +111,7 @@
     </div>
     <div class="acoes"><button class="primary" id="gerar">Criar roteiro</button></div>
     <p class="erro" id="erro"></p>
-    <p class="vazio">Sem chave de API ainda? <a href="#" id="exemplo">Veja um exemplo</a>.</p>
+    <p class="vazio">Primeira vez? <a href="#" id="exemplo">Veja um roteiro de exemplo</a> (não gasta sua cota).</p>
   </form>
 
   <section id="saida"></section>
@@ -128,6 +135,7 @@ const guardar = { ler(k, p) { try { return JSON.parse(localStorage.getItem(k)) ?
                   gravar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 let semente = '';
 let atual = null;
+let CHAVE_HIST = 'historico';
 
 async function rolar(s) {
   const c = await (await fetch('/api/dado' + (s ? '?s=' + encodeURIComponent(s) : ''))).json();
@@ -149,7 +157,9 @@ async function gerar(e) {
   try {
     const r = await fetch('/api/roteiro', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(dados()) });
     const j = await r.json();
+    if (r.status === 401) location.href = '/login';
     if (!r.ok) throw new Error(j.erro || 'Falha ao gerar.');
+    mostrarCota(j.uso_mes, j.limite_mensal);
     mostrar(j, true);
   } catch (err) { $('erro').textContent = err.message; }
   finally { $('gerar').disabled = false; $('gerar').textContent = 'Criar roteiro'; }
@@ -208,15 +218,15 @@ function mostrar(r, salvar) {
   $('btnVariar').onclick = async () => { await rolar(); gerar(); };
   $('saida').scrollIntoView({ behavior: 'smooth' });
   if (salvar) {
-    const h = guardar.ler('historico', []);
+    const h = guardar.ler(CHAVE_HIST, []);
     h.unshift({ quando: Date.now(), r });
-    guardar.gravar('historico', h.slice(0, 20));
+    guardar.gravar(CHAVE_HIST, h.slice(0, 20));
     historico();
   }
 }
 
 function historico() {
-  const h = guardar.ler('historico', []);
+  const h = guardar.ler(CHAVE_HIST, []);
   if (!h.length) return;
   $('historico').classList.remove('vazio');
   $('historico').innerHTML = h.map((x, i) => `<button data-i="${i}">${esc(x.r.roteiro.titulo_interno)} · ${x.r.viralometro.total}/100</button>`).join('');
@@ -260,8 +270,34 @@ $('exemplo').onclick = async (e) => { e.preventDefault(); mostrar(await (await f
 $('tpIniciar').onclick = iniciarTp;
 $('tpFechar').onclick = fecharTp;
 ['nicho', 'publico', 'tom'].forEach((k) => { $(k).value = guardar.ler('campo_' + k, ''); $(k).onchange = () => guardar.gravar('campo_' + k, $(k).value); });
-rolar();
-historico();
+function mostrarCota(uso, limite) {
+  $('cota').textContent = limite == null ? `${uso} roteiros este mês` : `${uso}/${limite} roteiros este mês`;
+}
+async function entrar() {
+  const r = await fetch('/api/eu');
+  if (!r.ok) return (location.href = '/login');
+  const eu = await r.json();
+  CHAVE_HIST = 'historico_' + eu.id; // cada pessoa vê só o próprio histórico neste navegador
+  $('quem').textContent = eu.nome || eu.email;
+  $('linkAdmin').hidden = eu.papel !== 'admin';
+  mostrarCota(eu.uso_mes, eu.limite_mensal);
+  rolar();
+  historico();
+}
+$('sair').onclick = async (e) => {
+  e.preventDefault();
+  await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  location.href = '/login';
+};
+$('trocarSenha').onclick = async (e) => {
+  e.preventDefault();
+  const atual = prompt('Senha atual:'); if (!atual) return;
+  const nova = prompt('Nova senha (mínimo 8 caracteres):'); if (!nova) return;
+  const r = await fetch('/api/senha', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ atual, nova }) });
+  const j = await r.json();
+  alert(r.ok ? 'Senha alterada.' : j.erro);
+};
+entrar();
 </script>
 </body>
 </html>
