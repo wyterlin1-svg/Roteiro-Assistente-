@@ -1,0 +1,31 @@
+{
+  "name": "roteiro-assistente",
+  "version": "1.0.0",
+  "description": "Roteirista 40s: IA que cria roteiros de Reels de até 40s guiados pelos sinais do algoritmo do Instagram",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "roteiro": "node --env-file-if-exists=.env cli.js",
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wyterlin1-svg/Roteiro-Assistente-.git"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/wyterlin1-svg/Roteiro-Assistente-/issues"
+  },
+  "homepage": "https://github.com/wyterlin1-svg/Roteiro-Assistente-#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0"
+  },
+  "type": "module",
+  "private": true,
+  "bin": {
+    "roteiro": "cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

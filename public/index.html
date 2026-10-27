@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roteirista 40s</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --card: #ffffff; --ink: #17151a; --muted: #6b6672; --line: #e4e0d8;
+    --accent: #ff3d6e; --accent-ink: #ffffff; --ok: #12a150; --warn: #c27c00; --bad: #d83a3a;
+    --chip: #f0ece4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f0e12; --card: #18161d; --ink: #f3f1f5; --muted: #9a94a3; --line: #2a2731;
+      --chip: #221f28; --ok: #3ccf7c; --warn: #f0b23a; --bad: #ff6b6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 28px; margin: 0; letter-spacing: -0.02em; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); margin: 4px 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input, select, textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  textarea { resize: vertical; min-height: 60px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { font: inherit; border: 0; border-radius: 12px; padding: 12px 16px; cursor: pointer; background: var(--chip); color: var(--ink); }
+  button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 700; width: 100%; padding: 15px; font-size: 17px; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .acoes button { flex: 1 1 auto; }
+  .dado { display: grid; gap: 6px; font-size: 14px; }
+  .dado b { color: var(--accent); }
+  .dado .cod { font-family: ui-monospace, monospace; font-size: 18px; letter-spacing: .15em; }
+  .placar { display: flex; align-items: center; gap: 16px; }
+  .nota { font-size: 44px; font-weight: 800; line-height: 1; }
+  .barra { height: 8px; background: var(--chip); border-radius: 99px; overflow: hidden; margin: 6px 0; }
+  .barra i { display: block; height: 100%; background: var(--accent); }
+  .sinais { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .alerta { font-size: 14px; color: var(--warn); margin: 4px 0; }
+  .gancho { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 10px 0; }
+  .tag { display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--chip); padding: 2px 8px; border-radius: 99px; }
+  .linha { display: grid; grid-template-columns: 56px 1fr; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .linha:first-of-type { border-top: 0; }
+  .tempo { font-family: ui-monospace, monospace; font-size: 13px; color: var(--accent); }
+  .fala { font-size: 17px; font-weight: 600; }
+  .meta { font-size: 13px; color: var(--muted); }
+  .timeline { display: flex; height: 10px; border-radius: 99px; overflow: hidden; gap: 2px; margin: 8px 0 4px; }
+  .timeline i { background: var(--accent); opacity: .35; }
+  .timeline i:nth-child(odd) { opacity: .7; }
+  .hist button { display: block; width: 100%; text-align: left; margin-top: 6px; font-size: 14px; }
+  .erro { color: var(--bad); }
+  .vazio { color: var(--muted); font-size: 14px; }
+  pre { white-space: pre-wrap; font: inherit; margin: 0; }
+  /* Teleprompter */
+  #tp { position: fixed; inset: 0; background: #000; color: #fff; display: none; flex-direction: column; z-index: 10; }
+  #tp.on { display: flex; }
+  #tp header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; font-family: ui-monospace, monospace; }
+  #tp .relogio { font-size: 22px; color: #ff3d6e; }
+  #tp .palco { flex: 1; overflow: hidden; position: relative; }
+  #tp .texto { position: absolute; left: 0; right: 0; padding: 40vh 20px; font-size: clamp(26px, 7vw, 44px); line-height: 1.35; font-weight: 700; text-align: center; }
+  #tp .texto p { margin: 0 0 1.2em; opacity: .35; transition: opacity .2s; }
+  #tp .texto p.agora { opacity: 1; }
+  #tp .texto small { display: block; font-size: .45em; color: #ff3d6e; font-weight: 600; }
+  #tp .conta { position: absolute; inset: 0; display: grid; place-items: center; font-size: 30vw; font-weight: 800; background: #000; }
+  #tp .conta[hidden] { display: none; }
+  #tp footer { display: flex; gap: 8px; padding: 12px 16px; }
+  #tp footer button { flex: 1; background: #222; color: #fff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Roteirista <span>40s</span></h1>
+  <p class="sub">Roteiros de Reels guiados pelos sinais do algoritmo: retenção, replay, envios e salvamentos.</p>
+
+  <form class="card" id="form">
+    <label for="nicho">Seu nicho *</label>
+    <input id="nicho" required placeholder="ex.: finanças pessoais, confeitaria, academia, advocacia">
+    <label for="tema">Tema ou ideia (deixe vazio se estiver sem ideia)</label>
+    <textarea id="tema" placeholder="ex.: por que ninguém consegue guardar dinheiro"></textarea>
+    <div class="row">
+      <div>
+        <label for="publico">Público</label>
+        <input id="publico" placeholder="ex.: mães de 30+">
+      </div>
+      <div>
+        <label for="duracao">Duração máxima</label>
+        <select id="duracao">
+          <option value="15">15s</option><option value="20">20s</option><option value="30" selected>30s</option><option value="40">40s</option>
+        </select>
+      </div>
+    </div>
+    <label for="tom">Tom</label>
+    <input id="tom" placeholder="ex.: direto e engraçado, sério, provocador">
+
+    <label>Dado da colisão criativa</label>
+    <div class="card dado" id="dado" style="margin:0"></div>
+    <div class="acoes">
+      <button type="button" id="rolar">🎲 Rolar outro dado</button>
+      <button type="button" id="semIdeia">💡 Estou sem ideia</button>
+    </div>
+    <div class="acoes"><button class="primary" id="gerar">Criar roteiro</button></div>
+    <p class="erro" id="erro"></p>
+    <p class="vazio">Sem chave de API ainda? <a href="#" id="exemplo">Veja um exemplo</a>.</p>
+  </form>
+
+  <section id="saida"></section>
+
+  <section class="card hist">
+    <b>Histórico</b>
+    <div id="historico" class="vazio">Seus roteiros ficam salvos aqui neste navegador.</div>
+  </section>
+</main>
+
+<div id="tp">
+  <header><span id="tpTitulo"></span><span class="relogio" id="tpRelogio">0.0s</span></header>
+  <div class="palco"><div class="texto" id="tpTexto"></div><div class="conta" id="tpConta" hidden></div></div>
+  <footer><button id="tpIniciar">▶ Gravar</button><button id="tpFechar">Fechar</button></footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const guardar = { ler(k, p) { try { return JSON.parse(localStorage.getItem(k)) ?? p; } catch { return p; } },
+                  gravar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+let semente = '';
+let atual = null;
+
+async function rolar(s) {
+  const c = await (await fetch('/api/dado' + (s ? '?s=' + encodeURIComponent(s) : ''))).json();
+  semente = c.semente;
+  $('dado').innerHTML = `<div class="cod">#${esc(c.semente)}</div>
+    <div><b>Emoção</b> ${esc(c.emocao)}</div><div><b>Ângulo</b> ${esc(c.angulo)}</div>
+    <div><b>Formato</b> ${esc(c.formato)}</div><div><b>Restrição</b> ${esc(c.restricao)}</div>`;
+}
+
+function dados() {
+  return { nicho: $('nicho').value, tema: $('tema').value, publico: $('publico').value,
+           tom: $('tom').value, duracao: Number($('duracao').value), semente };
+}
+
+async function gerar(e) {
+  e?.preventDefault();
+  if (!$('nicho').value.trim()) return $('nicho').focus();
+  $('gerar').disabled = true; $('gerar').textContent = 'Escrevendo…'; $('erro').textContent = '';
+  try {
+    const r = await fetch('/api/roteiro', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(dados()) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.erro || 'Falha ao gerar.');
+    mostrar(j, true);
+  } catch (err) { $('erro').textContent = err.message; }
+  finally { $('gerar').disabled = false; $('gerar').textContent = 'Criar roteiro'; }
+}
+
+function cor(n) { return n >= 85 ? 'var(--ok)' : n >= 65 ? 'var(--warn)' : 'var(--bad)'; }
+
+function mostrar(r, salvar) {
+  atual = r;
+  const s = r.roteiro, v = r.viralometro;
+  const total = s.roteiro.at(-1)?.fim_s || 1;
+  const maximos = { gancho: 25, duracao: 25, ritmo: 15, loop: 10, cta: 15, originalidade: 10 };
+  $('saida').innerHTML = `
+  <div class="card">
+    <div class="placar">
+      <div class="nota" style="color:${cor(v.total)}">${v.total}</div>
+      <div><b>${esc(v.nivel)}</b><div class="meta">~${v.segundos_estimados}s · ${v.palavras} palavras · dado #${esc(r.colisao.semente)} · ${esc(r.modelo)} · US$ ${r.custo_usd}${r.reescrito ? ' · reescrito 1x' : ''}</div></div>
+    </div>
+    <div class="sinais">${Object.entries(v.notas).map(([k, n]) => `<div>${k}<div class="barra"><i style="width:${(n / maximos[k]) * 100}%"></i></div></div>`).join('')}</div>
+    ${v.alertas.map((a) => `<p class="alerta">⚠ ${esc(a)}</p>`).join('')}
+  </div>
+  <div class="card">
+    <span class="tag">ideia</span>
+    <h2 style="margin:6px 0">${esc(s.titulo_interno)}</h2>
+    <p style="margin:0">${esc(s.ideia_central)}</p>
+    <p class="meta">❤️ ${esc(s.emocao_dominante)}<br>📨 ${esc(s.gatilho_de_envio)}</p>
+  </div>
+  <div class="card">
+    <span class="tag">3 ganchos para testar (use Reels de teste)</span>
+    ${s.ganchos.map((g) => `<div class="gancho"><div class="fala">“${esc(g.fala)}”</div>
+      <div class="meta">${esc(g.tipo)} · tela: ${esc(g.texto_tela)} · ${esc(g.visual)}</div></div>`).join('')}
+  </div>
+  <div class="card">
+    <span class="tag">roteiro · ${total}s</span>
+    <div class="timeline">${s.roteiro.map((c) => `<i style="flex:${Math.max(1, c.fim_s - c.inicio_s)}"></i>`).join('')}</div>
+    ${s.roteiro.map((c) => `<div class="linha"><div class="tempo">${c.inicio_s}–${c.fim_s}s</div><div>
+      <div class="fala">${esc(c.fala)}</div>
+      ${c.texto_tela ? `<div class="meta">🔤 ${esc(c.texto_tela)}</div>` : ''}
+      <div class="meta">🎥 ${esc(c.visual)}</div><div class="meta">🎯 ${esc(c.funcao)}</div></div></div>`).join('')}
+    <p class="meta">🔁 <b>Loop:</b> ${esc(s.loop)}<br>📣 <b>CTA (${esc(s.cta.tipo)}):</b> ${esc(s.cta.fala)}<br>
+      🖼 <b>Capa:</b> ${esc(s.texto_capa)}<br>🎵 <b>Áudio:</b> ${esc(s.audio_sugerido)}</p>
+    <div class="acoes">
+      <button id="btnTp">🎬 Teleprompter</button>
+      <button id="btnCopiar">📋 Copiar roteiro</button>
+      <button id="btnVariar">🎲 Mesma ideia, outro dado</button>
+    </div>
+  </div>
+  <div class="card"><span class="tag">legenda</span><pre style="margin-top:8px">${esc(s.legenda)}</pre>
+    <div class="acoes"><button id="btnLegenda">📋 Copiar legenda</button></div></div>
+  <div class="card"><span class="tag">por que o algoritmo entrega</span>
+    ${Object.entries(s.sinais_algoritmo).map(([k, t]) => `<p style="margin:8px 0"><b>${esc(k.replace('_', ' '))}:</b> ${esc(t)}</p>`).join('')}
+  </div>`;
+  $('btnTp').onclick = abrirTp;
+  $('btnCopiar').onclick = () => navigator.clipboard.writeText(s.roteiro.map((c) => `[${c.inicio_s}-${c.fim_s}s] ${c.fala}\n  tela: ${c.texto_tela}\n  visual: ${c.visual}`).join('\n\n'));
+  $('btnLegenda').onclick = () => navigator.clipboard.writeText(s.legenda);
+  $('btnVariar').onclick = async () => { await rolar(); gerar(); };
+  $('saida').scrollIntoView({ behavior: 'smooth' });
+  if (salvar) {
+    const h = guardar.ler('historico', []);
+    h.unshift({ quando: Date.now(), r });
+    guardar.gravar('historico', h.slice(0, 20));
+    historico();
+  }
+}
+
+function historico() {
+  const h = guardar.ler('historico', []);
+  if (!h.length) return;
+  $('historico').classList.remove('vazio');
+  $('historico').innerHTML = h.map((x, i) => `<button data-i="${i}">${esc(x.r.roteiro.titulo_interno)} · ${x.r.viralometro.total}/100</button>`).join('');
+  $('historico').querySelectorAll('button').forEach((b) => b.onclick = () => mostrar(h[b.dataset.i].r, false));
+}
+
+// Teleprompter: rola no ritmo do roteiro e destaca a cena do segundo atual.
+let tpTimer = null;
+function abrirTp() {
+  const s = atual.roteiro;
+  $('tpTitulo').textContent = s.titulo_interno;
+  $('tpTexto').innerHTML = s.roteiro.map((c) => `<p><small>${c.inicio_s}s · ${esc(c.texto_tela)}</small>${esc(c.fala)}</p>`).join('');
+  $('tpTexto').style.transform = 'translateY(0)';
+  $('tpRelogio').textContent = '0.0s';
+  $('tp').classList.add('on');
+}
+function fecharTp() { clearInterval(tpTimer); $('tp').classList.remove('on'); $('tpConta').hidden = true; }
+function iniciarTp() {
+  clearInterval(tpTimer);
+  const cenas = atual.roteiro.roteiro, ps = [...$('tpTexto').querySelectorAll('p')];
+  let n = 3; $('tpConta').hidden = false; $('tpConta').textContent = n;
+  const conta = setInterval(() => {
+    if (--n > 0) return ($('tpConta').textContent = n);
+    clearInterval(conta); $('tpConta').hidden = true;
+    const t0 = performance.now(), fim = cenas.at(-1).fim_s;
+    tpTimer = setInterval(() => {
+      const t = (performance.now() - t0) / 1000;
+      $('tpRelogio').textContent = t.toFixed(1) + 's';
+      const i = Math.max(0, cenas.findIndex((c) => t >= c.inicio_s && t < c.fim_s));
+      ps.forEach((p, j) => p.classList.toggle('agora', j === i));
+      $('tpTexto').style.transform = `translateY(${-ps[i].offsetTop + ps[0].offsetTop}px)`;
+      if (t >= fim) { clearInterval(tpTimer); $('tpRelogio').textContent = '✔ ' + fim + 's'; }
+    }, 100);
+  }, 800);
+}
+
+$('form').onsubmit = gerar;
+$('rolar').onclick = () => rolar();
+$('semIdeia').onclick = async () => { $('tema').value = ''; await rolar(); gerar(); };
+$('exemplo').onclick = async (e) => { e.preventDefault(); mostrar(await (await fetch('/api/exemplo')).json(), false); };
+$('tpIniciar').onclick = iniciarTp;
+$('tpFechar').onclick = fecharTp;
+['nicho', 'publico', 'tom'].forEach((k) => { $(k).value = guardar.ler('campo_' + k, ''); $(k).onchange = () => guardar.gravar('campo_' + k, $(k).value); });
+rolar();
+historico();
+</script>
+</body>
+</html>

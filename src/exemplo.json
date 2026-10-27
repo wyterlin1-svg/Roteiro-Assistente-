@@ -1,0 +1,100 @@
+{
+  "titulo_interno": "O café é inocente",
+  "ideia_central": "Inverter o conselho clássico de cortar o cafezinho e mostrar, ao vivo, o gasto invisível que realmente pesa: assinaturas esquecidas.",
+  "emocao_dominante": "alívio (\"então não sou só eu\") com raiva justa do conselho repetido",
+  "gatilho_de_envio": "Manda pra aquele amigo que vive dizendo que vai parar de tomar café pra economizar.",
+  "ganchos": [
+    {
+      "tipo": "ordem curta",
+      "fala": "Para de cortar o cafezinho. Ele nunca foi o problema.",
+      "texto_tela": "O vilão não é o café",
+      "visual": "Bate o copo de café na mesa, encarando a câmera."
+    },
+    {
+      "tipo": "número",
+      "fala": "Eu achei 197 reais por mês em dois minutos.",
+      "texto_tela": "R$ 197 escondidos",
+      "visual": "Mostra o celular colado na lente com o extrato desfocado."
+    },
+    {
+      "tipo": "acusação",
+      "fala": "Quem te mandou cortar o café mentiu pra você.",
+      "texto_tela": "Te enganaram",
+      "visual": "Aponta para a câmera segurando o copo."
+    }
+  ],
+  "roteiro": [
+    {
+      "inicio_s": 0,
+      "fim_s": 4,
+      "fala": "Para de cortar o cafezinho. Ele nunca foi o problema.",
+      "texto_tela": "O vilão não é o café",
+      "visual": "Bate o copo de café na mesa, encarando a câmera.",
+      "funcao": "retenção 3s: contraria o conselho que todo mundo já ouviu"
+    },
+    {
+      "inicio_s": 4,
+      "fim_s": 10,
+      "fala": "Seis reais por dia dá cento e oitenta no mês. Abre o app do banco comigo.",
+      "texto_tela": "R$ 180/mês",
+      "visual": "Corte seco para a tela do celular; o número aparece grande.",
+      "funcao": "conclusão: convida a agir junto, cria tarefa em andamento"
+    },
+    {
+      "inicio_s": 10,
+      "fim_s": 15,
+      "fala": "Procura débito automático. Tá vendo aquele app que você assinou e esqueceu?",
+      "texto_tela": "assinaturas esquecidas",
+      "visual": "Zoom rápido no extrato rolando.",
+      "funcao": "conclusão: identificação imediata"
+    },
+    {
+      "inicio_s": 15,
+      "fim_s": 21,
+      "fala": "Aqui tinha três: streaming, app de treino e um curso que eu nunca abri.",
+      "texto_tela": "3 assinaturas",
+      "visual": "Três cortes rápidos, um ícone de cada app.",
+      "funcao": "comentários: confissão que puxa \"eu também\""
+    },
+    {
+      "inicio_s": 21,
+      "fim_s": 25,
+      "fala": "Cento e noventa e sete reais. Mais que o café do mês inteiro.",
+      "texto_tela": "R$ 197 > R$ 180",
+      "visual": "Tela dividida: copo de café x as três assinaturas.",
+      "funcao": "salvamentos: payoff concreto e printável"
+    },
+    {
+      "inicio_s": 25,
+      "fim_s": 31,
+      "fala": "Cancelei tudo em dois minutos. O café eu continuo tomando, sem culpa.",
+      "texto_tela": "Cancelado ✅",
+      "visual": "Toma um gole devagar, sorrindo.",
+      "funcao": "emoção: alívio e permissão"
+    },
+    {
+      "inicio_s": 31,
+      "fim_s": 37,
+      "fala": "Manda pra quem vive dizendo que vai parar de tomar café. E para de cortar o cafezinho.",
+      "texto_tela": "manda pra essa pessoa",
+      "visual": "Aponta para a câmera e bate o copo na mesa de novo.",
+      "funcao": "envios + replay: CTA dentro da história e volta ao início"
+    }
+  ],
+  "loop": "A última frase repete a primeira e o copo bate na mesa com o mesmo som do início, então o replay parece continuação.",
+  "cta": {
+    "tipo": "envio",
+    "fala": "Manda pra quem vive dizendo que vai parar de tomar café."
+  },
+  "legenda": "Cortar o cafezinho é o conselho de finanças mais repetido e o que menos funciona. Confere seus débitos automáticos hoje e me conta quanto achou. #financaspessoais #economizardinheiro #assinaturas",
+  "texto_capa": "O café é inocente",
+  "audio_sugerido": "Sem música nos 3 primeiros segundos (o som do copo é o gancho); depois batida lo-fi baixa.",
+  "sinais_algoritmo": {
+    "retencao_3s": "Contraria um conselho famoso com som e gesto fortes no primeiro segundo.",
+    "conclusao": "Convida a abrir o app junto, criando uma tarefa que só termina no fim.",
+    "replay": "A última frase e o som do copo repetem a abertura.",
+    "envios": "Todo mundo conhece alguém que jura que vai parar de tomar café para economizar.",
+    "salvamentos": "Passo prático (procurar débito automático) que a pessoa quer fazer depois.",
+    "comentarios": "A confissão do curso nunca aberto puxa \"eu também\" e valores encontrados."
+  }
+}
