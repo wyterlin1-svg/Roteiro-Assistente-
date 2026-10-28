@@ -2,7 +2,7 @@
 // Acessos na variável USUARIOS="usuario:senha,outro:senha2".
 // As senhas viram hash scrypt na memória ao ligar; a sessão é um cookie assinado (7 dias).
 import { createServer } from "node:http";
-import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from "node:crypto";
@@ -92,7 +92,7 @@ function enviar(res, status, corpo, extra = {}) {
 }
 const ir = (res, para, extra = {}) => enviar(res, 303, "", { location: para, ...extra });
 
-const arquivoDe = (nome) => join(DADOS, Buffer.from(nome).toString("hex") + ".json");
+const arquivoDe = (nome, tipo = "") => join(DADOS, Buffer.from(nome).toString("hex") + tipo + ".json");
 function lerDados(nome) {
   try { return readFileSync(arquivoDe(nome), "utf8"); } catch { return "{}"; }
 }
@@ -160,6 +160,13 @@ createServer(async (req, res) => {
       return enviar(res, 405, '{"erro":"metodo"}', json);
     }
 
+    if (pathname.startsWith("/instagram/") || pathname.startsWith("/api/instagram")) {
+      if (!quem) return pathname.startsWith("/api/") ? enviar(res, 401, '{"erro":"sessao"}', { "content-type": "application/json" }) : ir(res, "/entrar");
+      // Ações que mudam algo exigem JSON, para outros sites não conseguirem dispará-las.
+      if (req.method === "POST" && !String(req.headers["content-type"]).startsWith("application/json")) return enviar(res, 415, '{"erro":"json"}', { "content-type": "application/json" });
+      if ((await rotasInstagram(req, res, pathname, quem)) !== false) return;
+    }
+
     if (!quem) return ir(res, "/entrar");
     if (pathname === "/" || pathname === "/index.html") return enviar(res, 200, comSair(quem), { "content-type": "text/html; charset=utf-8" });
     return ir(res, "/");
@@ -168,6 +175,133 @@ createServer(async (req, res) => {
     enviar(res, 500, "Erro interno", { "content-type": "text/plain; charset=utf-8" });
   }
 }).listen(PORTA, () => console.log(`Roteirista 40s na porta ${PORTA}. Acessos: ${[...usuarios.keys()].join(", ")}. Dados em ${DADOS}`));
+
+// ---- Instagram (API oficial da Meta, login pelo Instagram) ----
+// Configure INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET (app em developers.facebook.com).
+// O token de cada usuário fica só no servidor, em <dados>/<usuario>.ig.json; nunca vai ao navegador.
+const IG_ID = process.env.INSTAGRAM_APP_ID || "";
+const IG_SEGREDO = process.env.INSTAGRAM_APP_SECRET || "";
+const IG_VERSAO = process.env.INSTAGRAM_API_VERSAO || "v26.0";
+const IG_GRAPH = `https://graph.instagram.com/${IG_VERSAO}`;
+const IG_ESCOPO = "instagram_business_basic,instagram_business_manage_insights";
+const igConfigurado = () => !!(IG_ID && IG_SEGREDO);
+const igRetorno = (req) => process.env.INSTAGRAM_REDIRECT_URI || `https://${req.headers["x-forwarded-host"] || req.headers.host}/instagram/retorno`;
+
+function lerJson(arq) { try { return JSON.parse(readFileSync(arq, "utf8")); } catch { return null; } }
+function gravarJson(arq, obj) { writeFileSync(arq + ".tmp", JSON.stringify(obj), { mode: 0o600 }); renameSync(arq + ".tmp", arq); }
+
+async function igPedir(url, opcoes) {
+  const r = await fetch(url, { ...opcoes, signal: AbortSignal.timeout(20000) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) {
+    const e = new Error(j.error?.message || j.error_message || `Instagram respondeu ${r.status}`);
+    e.codigo = j.error?.code;
+    throw e;
+  }
+  return j;
+}
+
+// O "state" amarra o retorno do Instagram ao usuário logado e expira em 10 minutos.
+const igState = (nome) => { const c = `${Buffer.from(nome).toString("base64url")}.${Date.now() + 600000}`; return `${c}.${assinar(c)}`; };
+function igConferirState(state, nome) {
+  const [n, exp, ass] = String(state).split(".");
+  if (!ass || assinar(`${n}.${exp}`) !== ass || Number(exp) < Date.now()) return false;
+  return Buffer.from(n, "base64url").toString() === nome;
+}
+
+async function igConectar(nome, code, req) {
+  const corpo = new URLSearchParams({ client_id: IG_ID, client_secret: IG_SEGREDO, grant_type: "authorization_code", redirect_uri: igRetorno(req), code });
+  const curto = await igPedir("https://api.instagram.com/oauth/access_token", { method: "POST", body: corpo });
+  const longo = await igPedir(`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${encodeURIComponent(IG_SEGREDO)}&access_token=${encodeURIComponent(curto.access_token)}`);
+  const perfil = await igPedir(`${IG_GRAPH}/me?fields=user_id,username,followers_count&access_token=${encodeURIComponent(longo.access_token)}`);
+  gravarJson(arquivoDe(nome, ".ig"), { token: longo.access_token, expira: Date.now() + (longo.expires_in || 5184000) * 1000, renovado: Date.now(), usuario: perfil.username, seguidores: perfil.followers_count ?? null });
+}
+
+// Busca os últimos Reels com as métricas que o algoritmo mais pesa.
+const IG_METRICAS = ["views", "reach", "likes", "comments", "saved", "shares", "ig_reels_avg_watch_time", "reels_skip_rate"];
+async function igMetricas(id, token) {
+  for (const lista of [IG_METRICAS, IG_METRICAS.slice(0, 7), ["reach", "likes", "comments", "saved", "shares"]]) {
+    try {
+      const j = await igPedir(`${IG_GRAPH}/${id}/insights?metric=${lista.join(",")}&access_token=${encodeURIComponent(token)}`);
+      return Object.fromEntries((j.data || []).map((m) => [m.name, m.values?.[0]?.value ?? m.total_value?.value ?? 0]));
+    } catch (e) {
+      if (e.codigo === 190) throw e; // token inválido: não adianta tentar outras listas
+    }
+  }
+  return {};
+}
+async function igImportar(nome) {
+  const arq = arquivoDe(nome, ".ig"), conta = lerJson(arq);
+  if (!conta) throw new Error("Instagram não conectado.");
+  // Renova o token (vale 60 dias) uma vez por semana, para nunca expirar com o uso.
+  if (Date.now() - conta.renovado > 7 * 864e5) {
+    try {
+      const novo = await igPedir(`https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(conta.token)}`);
+      Object.assign(conta, { token: novo.access_token, expira: Date.now() + novo.expires_in * 1000, renovado: Date.now() });
+      gravarJson(arq, conta);
+    } catch {}
+  }
+  const lista = await igPedir(`${IG_GRAPH}/me/media?fields=id,caption,media_product_type,permalink,timestamp,thumbnail_url&limit=50&access_token=${encodeURIComponent(conta.token)}`);
+  const reels = (lista.data || []).filter((m) => m.media_product_type === "REELS").slice(0, 40);
+  const saida = [];
+  for (let i = 0; i < reels.length; i += 5) { // 5 por vez: rápido sem estourar o limite da API
+    const lote = await Promise.all(reels.slice(i, i + 5).map(async (m) => {
+      const x = await igMetricas(m.id, conta.token);
+      return {
+        id: m.id, legenda: m.caption || "", link: m.permalink, data: m.timestamp, capa: m.thumbnail_url || "",
+        views: x.views ?? 0, alcance: x.reach ?? 0, curtidas: x.likes ?? 0, comentarios: x.comments ?? 0,
+        salvos: x.saved ?? 0, envios: x.shares ?? 0,
+        tempo: Math.round(((x.ig_reels_avg_watch_time ?? 0) / 1000) * 10) / 10, // a API devolve milissegundos
+        pulos: x.reels_skip_rate ?? null,
+      };
+    }));
+    saida.push(...lote);
+  }
+  const pacote = { usuario: conta.usuario, seguidores: conta.seguidores, atualizado: new Date().toISOString(), reels: saida };
+  gravarJson(arquivoDe(nome, ".reels"), pacote);
+  return pacote;
+}
+
+async function rotasInstagram(req, res, pathname, quem) {
+  const json = { "content-type": "application/json; charset=utf-8" };
+  if (pathname === "/instagram/conectar") {
+    if (!igConfigurado()) return ir(res, "/?instagram=nao-configurado");
+    const url = new URL("https://www.instagram.com/oauth/authorize");
+    url.search = new URLSearchParams({ client_id: IG_ID, redirect_uri: igRetorno(req), response_type: "code", scope: IG_ESCOPO, state: igState(quem) });
+    return ir(res, url.toString());
+  }
+  if (pathname === "/instagram/retorno") {
+    const q = new URL(req.url, "http://x").searchParams;
+    if (q.get("error") || !q.get("code")) return ir(res, "/?instagram=cancelado");
+    if (!igConferirState(q.get("state"), quem)) return ir(res, "/?instagram=expirou");
+    try {
+      await igConectar(quem, q.get("code").replace(/#_$/, ""), req);
+      console.log(`Instagram conectado: ${quem}`);
+      await igImportar(quem).catch((e) => console.error(`Importação inicial falhou (${quem}): ${e.message}`));
+      return ir(res, "/?instagram=conectado");
+    } catch (e) {
+      console.error(`Falha ao conectar Instagram (${quem}): ${e.message}`);
+      return ir(res, "/?instagram=erro");
+    }
+  }
+  if (pathname === "/api/instagram" && req.method === "GET") {
+    const conta = lerJson(arquivoDe(quem, ".ig"));
+    const dados = lerJson(arquivoDe(quem, ".reels"));
+    return enviar(res, 200, JSON.stringify({ configurado: igConfigurado(), conectado: !!conta, usuario: conta?.usuario || null, ...(dados && { atualizado: dados.atualizado, seguidores: dados.seguidores, reels: dados.reels }) }), json);
+  }
+  if (pathname === "/api/instagram/atualizar" && req.method === "POST") {
+    try { return enviar(res, 200, JSON.stringify(await igImportar(quem)), json); }
+    catch (e) {
+      if (e.codigo === 190) { try { unlinkSync(arquivoDe(quem, ".ig")); } catch {} }
+      return enviar(res, 502, JSON.stringify({ erro: e.codigo === 190 ? "A conexão com o Instagram expirou. Conecte de novo." : `Não consegui buscar os dados agora: ${e.message}` }), json);
+    }
+  }
+  if (pathname === "/api/instagram/desconectar" && req.method === "POST") {
+    for (const t of [".ig", ".reels"]) try { unlinkSync(arquivoDe(quem, t)); } catch {}
+    return enviar(res, 200, '{"ok":true}', json);
+  }
+  return false;
+}
 
 // ---- Atualização automática ----
 // A cada poucos minutos confere o GitHub. Páginas novas entram na hora, sem reiniciar;

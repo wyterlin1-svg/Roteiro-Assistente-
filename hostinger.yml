@@ -22,6 +22,9 @@ services:
       USUARIOS: "admin:TroqueEstaSenha123,cliente1:OutraSenha456"
       NODE_ENV: production
       DADOS: /home/node/dados
+      # Conexão com o Instagram (opcional): veja "Conectar com o Instagram" no README
+      INSTAGRAM_APP_ID: ""
+      INSTAGRAM_APP_SECRET: ""
     user: node
     volumes:
       - roteirista_dados:/home/node   # histórico e resultados de cada usuário: sobrevivem a reinícios e reimplantações

@@ -140,6 +140,21 @@
   ol.algoritmo { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; }
   ol.algoritmo b { color: var(--fg); }
   .nota-ie { font: 700 11px var(--f-mono); color: var(--ok); }
+  .ig { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 12px; display: grid; gap: 10px; }
+  .ig-topo { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  .ig-acoes { display: flex; gap: 6px; margin-left: auto; }
+  .ig-h { font: 700 15px var(--f-display); margin: 6px 0 0; }
+  .ig .campeoes { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+  .botao-ig { justify-self: start; text-decoration: none; background: var(--accent); color: var(--on-accent); font: 700 15px var(--f-display); padding: 12px 18px; border-radius: 10px; }
+  ul.padroes { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+  .reels { display: grid; gap: 10px; }
+  .reel { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .reel img, .sem-capa { width: 56px; height: 100px; object-fit: cover; border-radius: 8px; background: var(--sunk); }
+  .reel p { margin: 0 0 2px; font-weight: 600; font-size: 14px; }
+  .reel-acoes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 13px; }
+  .reel-acoes a { color: var(--accent); font-weight: 600; }
+  .reel-acoes select { width: auto; max-width: 100%; padding: 6px 8px; font-size: 13px; }
+  .ig code { font-family: var(--f-mono); font-size: 12px; }
   .ideias { display: grid; gap: 10px; }
   .ideia { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; background: var(--surface); }
   .ideia h3 { margin: 0; font: 700 17px var(--f-display); }
@@ -663,6 +678,12 @@ async function carregarDoServidor() {
     enviarAoServidor(); // primeira vez no servidor: leva o que já estava neste aparelho
   }
   $("modo").textContent = "salvo no servidor";
+  carregarInstagram();
+  const retorno = new URLSearchParams(location.search).get("instagram");
+  const avisos = { conectado: ["Instagram conectado. Seus Reels foram analisados: veja no painel 🧠.", false], cancelado: ["Conexão com o Instagram cancelada.", true],
+    expirou: ["A conexão demorou demais. Clique em Conectar Instagram de novo.", true], erro: ["Não consegui conectar ao Instagram. Confira se a conta é profissional e tente de novo.", true],
+    "nao-configurado": ["A conexão com o Instagram ainda não foi ativada neste servidor.", true] };
+  if (avisos[retorno]) { status(...avisos[retorno]); history.replaceState(null, "", location.pathname); }
 }
 const tc = (s) => `00:${String(s).padStart(2, "0")}`;
 let col = colidir(novaSemente());
@@ -849,6 +870,7 @@ function roteiroViral() {
       ? `Puxado pelo que seu público premiou: ${g.map((c) => `${c.nome} "${c.v}" (índice ${Math.round(c.m)} vs. média ${Math.round(ap.media)})`).join("; ")}.`
       : `Combinação ponderada pelos seus ${ap.n} Reel(s) analisado(s) (média ${Math.round(ap.media)}).`;
   }
+  b.porque += melhorMomento();
   if (ap) b.aprendido = campeoes(ap).map((c) => `- Melhor ${c.nome}: ${c.v} (índice médio ${Math.round(c.m)}, ${c.n} Reel(s)); média geral ${Math.round(ap.media)}`).join("\n");
   return b;
 }
@@ -888,6 +910,92 @@ function raioX(texto) {
     loop: comuns.length >= 2 ? `A última frase retoma a primeira (${comuns.slice(0, 3).join(", ")}).` : "",
     cta: { tipo: cta, fala: "" }, legenda: texto, capa: "", audio: "", sinais: {},
   };
+}
+
+// ===== Instagram: dados reais dos Reels, importados pelo servidor =====
+let ig = null; // { configurado, conectado, usuario, atualizado, reels }
+const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+const faixaHora = (h) => (h < 6 ? "madrugada (0h–6h)" : h < 12 ? "manhã (6h–12h)" : h < 18 ? "tarde (12h–18h)" : "noite (18h–24h)");
+const porMil = (x, v) => (v ? Math.round(((x || 0) / v) * 10000) / 10 : 0);
+const primeiraLinha = (t = "") => (t.split("\n").find((l) => l.trim()) || "").trim();
+
+async function carregarInstagram() {
+  try {
+    const r = await fetch("/api/instagram", { cache: "no-store" });
+    if (!r.ok) return;
+    ig = await r.json();
+    if (!ocupado) { const y = scrollY; render(); scrollTo(0, y); }
+  } catch {}
+}
+function analisarInstagram() {
+  const rs = (ig?.reels || []).filter((r) => (r.views || r.alcance) > 0).map((r) => {
+    const v = r.views || r.alcance;
+    return { ...r, v, d: new Date(r.data), ie: indiceEntrega({ views: v, tempo: r.tempo, envios: r.envios, salvos: r.salvos, curtidas: r.curtidas, comentarios: r.comentarios }, 30).total };
+  }).sort((a, b) => b.ie - a.ie);
+  if (!rs.length) return null;
+  const media = rs.reduce((a, r) => a + r.ie, 0) / rs.length;
+  const grupos = (rotulo, f) => {
+    const g = {};
+    for (const r of rs) { const k = f(r); (g[k] ||= []).push(r.ie); }
+    const lista = Object.entries(g).filter(([, v]) => v.length >= 2).map(([k, v]) => ({ k, m: v.reduce((a, b) => a + b, 0) / v.length, n: v.length })).sort((a, b) => b.m - a.m);
+    return lista.length >= 2 ? { rotulo, melhor: lista[0], pior: lista.at(-1) } : null;
+  };
+  const padroes = [
+    grupos("Dia da semana", (r) => DIAS[r.d.getDay()]),
+    grupos("Horário", (r) => faixaHora(r.d.getHours())),
+    grupos("Primeira linha da legenda", (r) => (/\?|\d/.test(primeiraLinha(r.legenda)) ? "com número ou pergunta" : "sem número nem pergunta")),
+    grupos("Pedido na legenda", (r) => (/\b(manda|envia|marca|compartilha)/i.test(r.legenda) ? "pede para mandar ou marcar" : /\bsalva/i.test(r.legenda) ? "pede para salvar" : "sem pedido")),
+    grupos("Tamanho da legenda", (r) => (palavras(r.legenda) <= 25 ? "curta (até 25 palavras)" : "longa (mais de 25 palavras)")),
+  ].filter(Boolean);
+  const soma = (k) => rs.reduce((a, r) => a + (r[k] || 0), 0), vt = soma("v");
+  const pulos = rs.filter((r) => r.pulos != null);
+  return {
+    rs, media, padroes,
+    envios: porMil(soma("envios"), vt), salvos: porMil(soma("salvos"), vt),
+    tempo: Math.round((rs.reduce((a, r) => a + r.tempo, 0) / rs.length) * 10) / 10,
+    pulos: pulos.length ? Math.round(pulos.reduce((a, r) => a + r.pulos, 0) / pulos.length) : null,
+  };
+}
+
+function blocoInstagram() {
+  if (!noServidor) return "";
+  if (!ig) return "";
+  if (!ig.configurado) return `<div class="ig"><b>📱 Instagram</b><p class="vazio">A conexão com o Instagram ainda não foi ativada neste servidor. O administrador precisa criar um app na Meta e colocar <code>INSTAGRAM_APP_ID</code> e <code>INSTAGRAM_APP_SECRET</code> no YAML.</p></div>`;
+  if (!ig.conectado) return `<div class="ig"><b>📱 Instagram</b>
+    <p class="vazio">Conecte sua conta profissional (criador ou empresa) e eu analiso seus Reels de verdade: alcance, tempo assistido, compartilhamentos, salvamentos e taxa de pulos. Só leitura: o Roteirista nunca posta nada.</p>
+    <a class="botao-ig" href="/instagram/conectar">Conectar Instagram</a></div>`;
+  const a = analisarInstagram();
+  const hist = loja.ler("historico", []).map((h, i) => ({ h, i })).filter(({ h }) => !h.resultado && h.r?.genes);
+  const quando = ig.atualizado ? new Date(ig.atualizado).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "nunca";
+  let html = `<div class="ig"><div class="ig-topo"><b>📱 @${esc(ig.usuario || "")}</b>
+    <span class="vazio">${a ? a.rs.length : 0} Reels analisados · atualizado ${esc(quando)}</span>
+    <span class="ig-acoes"><button type="button" data-acao="igAtualizar">Atualizar dados</button><button type="button" data-acao="igSair">Desconectar</button></span></div>`;
+  if (!a) return html + `<p class="vazio">Nenhum Reel com métricas ainda. Poste um Reel e clique em Atualizar dados.</p></div>`;
+  html += `<div class="campeoes">
+      <div><b>índice médio</b>${Math.round(a.media)}<br><span>de 0 a 100</span></div>
+      <div><b>compartilhamentos</b>${a.envios}<br><span>por 1.000 views · meta ${REFS.envios}</span></div>
+      <div><b>salvamentos</b>${a.salvos}<br><span>por 1.000 views · meta ${REFS.salvos}</span></div>
+      <div><b>tempo médio</b>${a.tempo}s<br><span>assistido por Reel</span></div>
+      ${a.pulos != null ? `<div><b>taxa de pulos</b>${a.pulos}%<br><span>quanto menor, melhor</span></div>` : ""}
+    </div>`;
+  if (a.padroes.length) html += `<h3 class="ig-h">O que funciona no seu perfil</h3><ul class="padroes">${a.padroes.map((p) =>
+    `<li><b>${esc(p.rotulo)}:</b> ${esc(p.melhor.k)} entrega mais (índice ${Math.round(p.melhor.m)}, ${p.melhor.n} Reels) que ${esc(p.pior.k)} (${Math.round(p.pior.m)}).</li>`).join("")}</ul>`;
+  else html += `<p class="vazio">Com mais Reels postados aparecem os padrões do seu perfil (melhor dia, horário, tipo de legenda).</p>`;
+  html += `<h3 class="ig-h">Os 5 que mais entregaram</h3><div class="reels">${a.rs.slice(0, 5).map((r) => `
+    <div class="reel">${r.capa ? `<img src="${esc(r.capa)}" alt="" loading="lazy">` : `<div class="sem-capa"></div>`}
+      <div><p>${esc(primeiraLinha(r.legenda).slice(0, 90) || "(sem legenda)")}</p>
+      <span class="vazio">índice <b>${r.ie}</b> · ${r.v.toLocaleString("pt-BR")} views · ${porMil(r.envios, r.v)} compart./mil · ${r.tempo}s</span>
+      <div class="reel-acoes"><a href="${esc(r.link)}" target="_blank" rel="noopener">Abrir</a>
+        <button type="button" data-acao="igRaiox" data-id="${esc(r.id)}">Raio-X da legenda</button>
+        ${hist.length ? `<select data-vincular="${esc(r.id)}" aria-label="Vincular a um roteiro"><option value="">Vincular a um roteiro…</option>${hist.map(({ h, i }) => `<option value="${i}">${esc(h.r.titulo)} · ${esc(h.briefing?.nicho || "")}</option>`).join("")}</select>` : ""}
+      </div></div></div>`).join("")}</div>
+    <p class="vazio">Vincular um Reel ao roteiro que você gravou passa os números reais para o aprendizado: o 🎲 Roteiro viral aleatório começa a puxar para o que deu certo.</p></div>`;
+  return html;
+}
+function melhorMomento() {
+  const a = ig?.conectado && analisarInstagram();
+  const dia = a?.padroes.find((p) => p.rotulo === "Dia da semana"), hora = a?.padroes.find((p) => p.rotulo === "Horário");
+  return dia || hora ? ` Melhor momento para postar no seu perfil: ${[dia?.melhor.k, hora?.melhor.k].filter(Boolean).join(", ")}.` : "";
 }
 
 // ===== Renderização =====
@@ -1008,6 +1116,7 @@ function blocoLaboratorio() {
   const ap = aprendizado(), top = campeoes(ap);
   return `<section class="bloco">
     <h2>🧠 O que o seu público mostrou</h2>
+    ${blocoInstagram()}
     ${ap ? `<p class="vazio" style="margin-top:6px">Base: ${ap.n} Reel(s) com resultado · Índice de Entrega médio: <b>${Math.round(ap.media)}</b>. O botão <b>🎲 Roteiro viral aleatório</b> já usa isso.</p>
       <div class="campeoes">${top.map((c) => `<div><b>melhor ${c.nome}</b>${esc(c.v)}<br><span>índice ${Math.round(c.m)} · ${c.n} Reel(s)</span></div>`).join("")}</div>`
     : `<p class="vazio" style="margin-top:6px">Ainda sem dados. Poste um roteiro, registre os números em <b>📊 Resultado deste Reel</b>, e aqui aparecem o estilo, o objeto, o formato, a emoção e a duração que mais entregam para você.</p>`}
@@ -1045,6 +1154,19 @@ $("folha").addEventListener("focusout", (e) => {
     const h = loja.ler("historico", []);
     if (h[atual.hist]) { h[atual.hist].r = atual.r; loja.gravar("historico", h); }
   }
+});
+
+$("folha").addEventListener("change", (e) => {
+  const sel = e.target.closest("[data-vincular]");
+  if (!sel || sel.value === "") return;
+  const reel = ig.reels.find((x) => x.id === sel.dataset.vincular), h = loja.ler("historico", []), alvo = h[+sel.value];
+  if (!reel || !alvo) return;
+  const m = { views: reel.views || reel.alcance, tempo: reel.tempo, envios: reel.envios, salvos: reel.salvos, curtidas: reel.curtidas, comentarios: reel.comentarios, reel: reel.id };
+  m.indice = indiceEntrega(m, alvo.duracao).total;
+  alvo.resultado = m;
+  loja.gravar("historico", h);
+  status(`Vinculado: "${alvo.r.titulo}" recebeu os números reais (Índice de Entrega ${m.indice}). O aprendizado já foi atualizado.`);
+  const y = scrollY; render(); scrollTo(0, y);
 });
 
 async function copiar(texto, botao) {
@@ -1093,6 +1215,22 @@ $("folha").addEventListener("click", (e) => {
     loja.gravar("historico", h);
     status(`Resultado salvo: Índice de Entrega ${m.indice}. Os próximos sorteios já levam isso em conta.`);
     const y = scrollY; render(); scrollTo(0, y);
+  }
+  if (a === "igAtualizar") {
+    b.disabled = true; b.textContent = "Buscando…";
+    fetch("/api/instagram/atualizar", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.erro); status(`Pronto: ${j.reels.length} Reels atualizados.`); })
+      .catch((e) => status(e.message || "Não consegui atualizar agora.", true))
+      .finally(carregarInstagram);
+  }
+  if (a === "igSair") {
+    if (b.dataset.confirma !== "1") { b.dataset.confirma = "1"; b.textContent = "Clique de novo para desconectar"; return; }
+    fetch("/api/instagram/desconectar", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).finally(() => { status("Instagram desconectado."); carregarInstagram(); });
+  }
+  if (a === "igRaiox") {
+    const reel = ig.reels.find((x) => x.id === b.dataset.id);
+    $("raioxTexto").value = reel?.legenda || "";
+    $("analisar").click();
   }
   if (a === "raioxNovo") {
     // Usa o assunto da primeira frase, sem os clichês que o Raio-X apontou.

@@ -46,6 +46,18 @@ Depois abra `http://IP-DO-SEU-VPS:8081`.
 
 Use [`hostinger-https.yml`](hostinger-https.yml) no lugar do `hostinger.yml`. Ele segue o mesmo padrão de labels do n8n da Hostinger (entrypoint `websecure`, certresolver `letsencrypt`). Antes de implantar, troque o subdomínio e as senhas. Crie também um registro DNS do tipo **A** do subdomínio apontando para o IP do VPS.
 
+## Conectar com o Instagram
+
+Cada usuário pode conectar a própria conta **profissional** (criador ou empresa) do Instagram. O Roteirista busca os últimos Reels com as métricas oficiais (visualizações, alcance, curtidas, comentários, salvamentos, compartilhamentos, tempo médio assistido e taxa de pulos), mostra o que funciona no perfil (melhor dia, horário, tipo de legenda) e permite vincular cada Reel ao roteiro gravado para alimentar o aprendizado. É só leitura: nada é postado. O token fica só no servidor.
+
+Para ativar (uma vez, pelo administrador):
+
+1. Em [developers.facebook.com](https://developers.facebook.com), crie um app com o caso de uso **Gerenciar mensagens e conteúdo no Instagram** (API do Instagram).
+2. Em **API do Instagram > Configurar com login do Instagram**, copie o **ID do app do Instagram** e a **Chave secreta do app do Instagram**.
+3. Em **Configurar login comercial do Instagram**, adicione a URI de redirecionamento: `https://roteiros.murinoi.com/instagram/retorno` (troque pelo seu domínio).
+4. Enquanto o app não passa pela revisão da Meta, só conectam as contas adicionadas em **Funções do app > Testadores do Instagram**. A pessoa aceita o convite no Instagram em **Configurações > Apps e sites > Convites de testador**.
+5. No YAML, em `environment`, adicione `INSTAGRAM_APP_ID` e `INSTAGRAM_APP_SECRET` e implante de novo.
+
 ## Atualizar
 
 **Automático.** A cada 5 minutos o servidor confere o GitHub:
