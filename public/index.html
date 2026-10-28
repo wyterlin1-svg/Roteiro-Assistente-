@@ -124,6 +124,22 @@
   .sinais b { display: block; font: 600 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
   pre.legenda { white-space: pre-wrap; font: inherit; margin: 10px 0; background: var(--sunk); padding: 12px; border-radius: 10px; }
 
+  button.viral { background: var(--fg); color: var(--bg); border-color: transparent; font: 700 15px var(--f-display); padding: 12px; }
+  .raiox summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  .raiox[open] { display: grid; gap: 8px; }
+  .porque { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--sunk); font-size: 13px; }
+  .porque b { font: 600 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); display: block; }
+  .metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 12px 0; }
+  .metricas label { font-weight: 500; }
+  .indice { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 10px; }
+  .indice strong { font: 800 34px var(--f-display); font-variant-numeric: tabular-nums; }
+  .campeoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
+  .campeoes div { background: var(--sunk); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .campeoes b { display: block; font: 600 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .campeoes span { font-family: var(--f-mono); color: var(--accent); font-size: 12px; }
+  ol.algoritmo { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; }
+  ol.algoritmo b { color: var(--fg); }
+  .nota-ie { font: 700 11px var(--f-mono); color: var(--ok); }
   .ideias { display: grid; gap: 10px; }
   .ideia { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; background: var(--surface); }
   .ideia h3 { margin: 0; font: 700 17px var(--f-display); }
@@ -194,9 +210,16 @@
         </select></label>
 
       <button class="go" id="criar">Criar roteiro</button>
+      <button type="button" class="viral" id="viral">🎲 Roteiro viral aleatório</button>
       <div class="linha-btn">
         <button type="button" id="semIdeia">Estou sem ideia: me dê 5</button>
       </div>
+      <details class="raiox">
+        <summary>🔬 Raio-X de um Reel</summary>
+        <p class="vazio">Cole a fala ou a legenda de qualquer Reel (seu ou de um viral) e veja como ele se sai nos sinais do algoritmo.</p>
+        <textarea id="raioxTexto" rows="5" placeholder="Cole aqui o texto do Reel…"></textarea>
+        <button type="button" id="analisar">Analisar</button>
+      </details>
       <p class="status" id="status" role="status"></p>
     </form>
 
@@ -314,6 +337,7 @@ function promptRoteiro(b, ajuste) {
     b.publico && `Público: ${b.publico}`, b.tom && `Tom: ${b.tom}`,
     `Duração máxima: ${b.duracao}s (no máximo ${Math.floor(b.duracao * PPS)} palavras faladas no total)`,
     "", `COLISÃO #${b.col.semente}`, `- Emoção: ${b.col.emocao}`, `- Ângulo: ${b.col.angulo}`, `- Formato: ${b.col.formato}`, `- Restrição: ${b.col.restricao}`,
+    b.aprendido && `\nO QUE O PÚBLICO DESTE PERFIL JÁ MOSTROU (dados reais de Reels postados):\n${b.aprendido}\nUse isso a favor da entrega, sem copiar roteiros anteriores.`,
     ajuste && `\nREESCREVA corrigindo estes problemas da versão anterior:\n${ajuste}`,
     "", FORMATO].filter(Boolean).join("\n");
 }
@@ -539,7 +563,7 @@ function motorRoteiro(b) {
   const N = limpar(b.nicho);
   const A = b.tema ? limpar(b.tema) : um(ASSUNTOS).replace("{N}", N);
   const P = b.publico ? maiuscula(limpar(b.publico)) : "";
-  const O = um(OBJETOS), acao = um(ACOES);
+  const O = OBJETOS.find((o) => o.c === b.objeto) || um(OBJETOS), acao = um(ACOES);
   const E = ESTRUTURAS[Math.max(0, ANGULOS.indexOf(b.col.angulo))];
   const V = VISUAIS[Math.max(0, FORMATOS.indexOf(b.col.formato))];
   const sub = preenchedor({ N, A, P, O, acao, d: b.duracao });
@@ -562,6 +586,7 @@ function motorRoteiro(b) {
   const outros = E.g.filter((g) => g !== gancho).map((g) => [E.tipo, g]);
   const alts = embaralhar([...outros, ...GANCHOS_ALT.filter((g) => g[0] !== "público" || P)], r).slice(0, 2);
   return {
+    genes: genesDe(b, O.c),
     titulo: E.capa,
     ideia_central: `${E.por} A metáfora do roteiro: ${O.o}. Regra criativa do dado: ${b.col.restricao}.`,
     emocao: b.col.emocao,
@@ -620,7 +645,7 @@ const ERROS = {
 const msgErro = (e) => ERROS[e?.code] || "Algo falhou na conexão com o Claude. Tente de novo.";
 
 function status(t, erro) { $("status").textContent = t; $("status").classList.toggle("erro", !!erro); }
-function travar(sim) { ocupado = sim; ["criar", "semIdeia", "rolar"].forEach((id) => ($(id).disabled = sim)); document.querySelectorAll("[data-acao]").forEach((b) => (b.disabled = sim)); }
+function travar(sim) { ocupado = sim; ["criar", "semIdeia", "rolar", "viral", "analisar"].forEach((id) => ($(id).disabled = sim)); document.querySelectorAll("[data-acao]").forEach((b) => (b.disabled = sim)); }
 
 function mostrarDado() {
   $("semente").textContent = "#" + col.semente;
@@ -636,7 +661,8 @@ const usarIA = () => !!sample && $("motor").value === "ia";
 
 function entregar(r, b, motor) {
   r.ganchos = Array.isArray(r.ganchos) ? r.ganchos : [];
-  atual = { r, col: b.col, duracao: b.duracao, briefing: b, exemplo: false, motor };
+  r.genes = r.genes || genesDe(b, b.objeto);
+  atual = { r, col: b.col, duracao: b.duracao, briefing: b, exemplo: false, motor, porque: b.porque };
   salvarHistorico();
   ideias = null;
   render();
@@ -694,6 +720,137 @@ async function gerarIdeias() {
   }
 }
 
+// ===== Laboratório: aprende com os resultados reais dos seus Reels =====
+// Cada roteiro guarda seus "genes" (estilo, objeto, formato, emoção, duração).
+// Depois de postar, o criador anota 6 números do Insights; o Índice de Entrega
+// mostra quais genes o público dele premia, e o sorteio viral passa a favorecê-los.
+const GENES = { angulo: "estilo", objeto: "objeto", formato: "formato", emocao: "emoção", duracao: "duração" };
+const curto = (t = "") => String(t).split(/[:(,]/)[0].trim();
+function genesDe(b, objeto) {
+  const E = ESTRUTURAS[Math.max(0, ANGULOS.indexOf(b.col.angulo))];
+  return { angulo: E.tipo, objeto: objeto || "", formato: curto(b.col.formato), emocao: curto(b.col.emocao), duracao: b.duracao + "s" };
+}
+
+// Referências por 1.000 visualizações (Reels bem distribuídos ficam perto ou acima disso).
+const REFS = { envios: 10, salvos: 15, curtidas: 40, comentarios: 5 };
+function indiceEntrega(m, dur) {
+  const v = Math.max(1, +m.views || 0);
+  const taxa = (x, ref) => Math.min(1, ((+x || 0) / v) * 1000 / ref);
+  const partes = {
+    retenção: 40 * Math.min(1, (+m.tempo || 0) / Math.max(1, dur)),
+    envios: 25 * taxa(m.envios, REFS.envios),
+    salvamentos: 15 * taxa(m.salvos, REFS.salvos),
+    curtidas: 10 * taxa(m.curtidas, REFS.curtidas),
+    comentários: 10 * taxa(m.comentarios, REFS.comentarios),
+  };
+  return { total: Math.round(Object.values(partes).reduce((a, b) => a + b, 0)), partes };
+}
+const MAXI = { retenção: 40, envios: 25, salvamentos: 15, curtidas: 10, comentários: 10 };
+
+function aprendizado() {
+  const com = loja.ler("historico", []).filter((h) => h.resultado && h.r?.genes);
+  if (!com.length) return null;
+  const media = com.reduce((a, h) => a + h.resultado.indice, 0) / com.length;
+  const stats = {};
+  for (const g of Object.keys(GENES)) {
+    stats[g] = {};
+    for (const h of com) {
+      const val = h.r.genes[g];
+      if (!val) continue;
+      const s = (stats[g][val] ||= { soma: 0, n: 0 });
+      s.soma += h.resultado.indice; s.n++;
+    }
+  }
+  return { n: com.length, media, stats };
+}
+// Peso de sorteio: o que entregou acima da sua média ganha mais chance; o que nunca foi
+// testado ganha um pequeno bônus de curiosidade, para o motor continuar descobrindo.
+function peso(ap, gene, valor) {
+  const s = ap?.stats[gene]?.[valor];
+  if (!s) return ap ? 1.2 : 1;
+  const conf = Math.min(1, s.n / 3);
+  return Math.exp((conf * (s.soma / s.n - ap.media)) / 12);
+}
+function sortear(lista, pesoDe) {
+  const ps = lista.map(pesoDe), tot = ps.reduce((a, b) => a + b, 0);
+  let x = Math.random() * tot;
+  for (let i = 0; i < lista.length; i++) if ((x -= ps[i]) <= 0) return lista[i];
+  return lista.at(-1);
+}
+function campeoes(ap) {
+  if (!ap) return [];
+  return Object.entries(GENES).map(([g, nome]) => {
+    const melhor = Object.entries(ap.stats[g]).map(([v, s]) => ({ v, m: s.soma / s.n, n: s.n })).sort((a, b) => b.m - a.m)[0];
+    return melhor && { gene: g, nome, ...melhor };
+  }).filter(Boolean);
+}
+
+// Sorteia tudo, puxando para o que já funcionou com o seu público (80%) e explorando o novo (20%).
+function roteiroViral() {
+  const ap = aprendizado();
+  const explorar = !ap || Math.random() < 0.2;
+  const pesoDe = (g) => (v) => (explorar ? 1 : peso(ap, g, v));
+  const E = sortear(ESTRUTURAS, (e) => pesoDe("angulo")(e.tipo));
+  const formato = sortear(FORMATOS, (f) => pesoDe("formato")(curto(f)));
+  const emocao = sortear(EMOCOES, (e) => pesoDe("emocao")(curto(e)));
+  const objeto = sortear(OBJETOS, (o) => pesoDe("objeto")(o.c)).c;
+  // Sem dados, 20–30s tendem a reter melhor que 40s.
+  const base = { 15: 1, 20: 1.25, 30: 1.25, 40: 0.8 };
+  const dur = +sortear(Object.keys(base), (d) => base[d] * pesoDe("duracao")(d + "s"));
+  col = { ...colidir(novaSemente()), angulo: ANGULOS[ESTRUTURAS.indexOf(E)], formato, emocao };
+  marcarDuracao(dur);
+  mostrarDado();
+  const b = briefing();
+  b.objeto = objeto;
+  if (!ap) b.porque = "Ainda sem resultados seus: sorteio guiado pelos sinais que o Instagram já divulgou. Registre os números dos seus Reels para eu aprender com o seu público.";
+  else if (explorar) b.porque = `Sorteio de descoberta: 1 em cada 5 roteiros testa combinações novas para achar o próximo campeão. Base: ${ap.n} Reel(s) analisado(s).`;
+  else {
+    const g = campeoes(ap).filter((c) => [E.tipo, curto(formato), curto(emocao), objeto, dur + "s"].includes(c.v) && c.m > ap.media);
+    b.porque = g.length
+      ? `Puxado pelo que seu público premiou: ${g.map((c) => `${c.nome} "${c.v}" (índice ${Math.round(c.m)} vs. média ${Math.round(ap.media)})`).join("; ")}.`
+      : `Combinação ponderada pelos seus ${ap.n} Reel(s) analisado(s) (média ${Math.round(ap.media)}).`;
+  }
+  if (ap) b.aprendido = campeoes(ap).map((c) => `- Melhor ${c.nome}: ${c.v} (índice médio ${Math.round(c.m)}, ${c.n} Reel(s)); média geral ${Math.round(ap.media)}`).join("\n");
+  return b;
+}
+
+async function criarViral() {
+  if (!$("nicho").value.trim()) { status("Escreva seu nicho e eu sorteio o roteiro.", true); $("nicho").focus(); return; }
+  const b = roteiroViral();
+  if (!usarIA()) {
+    entregar(motorRoteiro(b), b, true);
+    status("Roteiro sorteado. Depois de postar, registre os números para eu aprender.");
+    return;
+  }
+  travar(true);
+  status("Sorteando e escrevendo com a IA…");
+  try {
+    const r = await sample.json(promptRoteiro(b), { modelTier: "default", cache: false });
+    if (!r || !Array.isArray(r.cenas) || !r.cenas.length) throw { code: "invalid_json" };
+    status("");
+    entregar(r, b, false);
+  } catch (e) {
+    status(msgErro(e), true);
+  } finally {
+    travar(false);
+  }
+}
+
+// Raio-X: analisa qualquer roteiro ou legenda colado, com os mesmos critérios.
+function raioX(texto) {
+  const frases = texto.replace(/\s+/g, " ").match(/[^.!?…]+[.!?…]*/g)?.map((f) => f.trim()).filter(Boolean) || [];
+  let t = 0;
+  const cenas = frases.map((f) => { const ini = t; t += Math.max(2, Math.ceil(palavras(f) / PPS)); return { inicio: ini, fim: t, fala: f, texto_tela: "?", visual: "—", sinal: "" }; });
+  const ultima = (frases.at(-1) || "").toLowerCase(), primeira = (frases[0] || "").toLowerCase();
+  const comuns = primeira.split(/\W+/).filter((w) => w.length > 3 && ultima.includes(w));
+  const cta = /\b(manda|envia|marca|compartilha)/i.test(texto) ? "envio" : /\bsalva/i.test(texto) ? "salvar" : /\bcomenta/i.test(texto) ? "comentar" : "";
+  return {
+    titulo: "Raio-X", ideia_central: "", emocao: "", gatilho_de_envio: "", ganchos: [], cenas,
+    loop: comuns.length >= 2 ? `A última frase retoma a primeira (${comuns.slice(0, 3).join(", ")}).` : "",
+    cta: { tipo: cta, fala: "" }, legenda: texto, capa: "", audio: "", sinais: {},
+  };
+}
+
 // ===== Renderização =====
 function render() {
   const f = $("folha");
@@ -714,13 +871,17 @@ function render() {
     <div class="placar">
       <div class="anel" style="--p:${v.total};--cor:${cor}"><span>${v.total}</span></div>
       <div><h3>${esc(v.nivel)}</h3>
-        <div class="vazio">~${v.segundos}s de fala · ${v.palavras} palavras · dado #${esc(atual.col.semente)}${atual.exemplo ? " · exemplo" : ""}</div></div>
+        <div class="vazio">~${v.segundos}s de fala · ${v.palavras} palavras${atual.raiox ? " · raio-x" : ` · dado #${esc(atual.col.semente)}`}${atual.exemplo ? " · exemplo" : ""}</div></div>
     </div>
+    ${atual.porque ? `<p class="porque"><b>por que este sorteio</b>${esc(atual.porque)}</p>` : ""}
+    ${atual.raiox ? `<p class="porque"><b>como ler</b>O Raio-X lê só o texto: cada frase vira uma cena com o tempo de fala estimado. Texto na tela e cortes não aparecem no texto, então confira esses dois no vídeo.</p>
+      <div class="linha-btn" style="margin-top:12px"><button type="button" data-acao="raioxNovo">Criar um roteiro viral com este assunto</button></div>` : ""}
     <div class="medidas">${Object.entries(v.n).map(([k, x]) => `<div class="medida">${nomes[k]} ${x}/${MAX[k]}<div class="bar"><i style="width:${(x / MAX[k]) * 100}%"></i></div></div>`).join("")}</div>
     ${v.alertas.length ? `<ul class="alertas">${v.alertas.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>
       ${atual.exemplo || atual.motor || !sample ? "" : `<div class="linha-btn" style="margin-top:12px"><button type="button" data-acao="corrigir">Corrigir esses pontos</button></div>`}` : ""}
   </section>
 
+  ${atual.raiox ? `<section class="bloco"><h2>Frases analisadas</h2>${r.cenas.map((c) => `<div class="cena"><div class="tc">${tc(c.inicio)}<small>→ ${tc(c.fim)}</small></div><div><p class="fala">${esc(c.fala)}</p></div></div>`).join("")}</section>` : `
   <section class="bloco">
     <span class="selo">${atual.exemplo ? "exemplo · finanças pessoais" : atual.motor ? "motor próprio" : "ia do claude"}</span>
     <h3 class="titulo-roteiro">${esc(r.titulo)}</h3>
@@ -769,23 +930,68 @@ function render() {
   <section class="bloco">
     <h2>Por que o algoritmo entrega</h2>
     <div class="sinais">${Object.entries(r.sinais || {}).map(([k, t]) => `<div><b>${esc(k.replace("_", " "))}</b>${esc(t)}</div>`).join("")}</div>
-  </section>`;
+  </section>
+  ${atual.exemplo ? "" : blocoResultado()}`}`;
+  html += blocoLaboratorio();
 
   const hist = loja.ler("historico", []);
   html += `<section class="bloco"><h2>Seus roteiros</h2><div class="hist" style="margin-top:10px">${
-    hist.length ? hist.map((h, i) => `<button type="button" data-acao="hist" data-k="${i}"><span>${esc(h.r.titulo)}</span><span>${avaliar(h.r, h.duracao).total}</span></button>`).join("")
+    hist.length ? hist.map((h, i) => `<button type="button" data-acao="hist" data-k="${i}"><span>${esc(h.r.titulo)}${h.resultado ? ` <span class="nota-ie">· entrega ${h.resultado.indice}</span>` : ""}</span><span>${avaliar(h.r, h.duracao).total}</span></button>`).join("")
     : `<p class="vazio">Os roteiros que você criar ficam guardados aqui, neste navegador.</p>`}</div></section>`;
 
   f.innerHTML = html;
   if (ocupado) travar(true);
 }
 
+function blocoResultado() {
+  const h = atual.hist != null ? loja.ler("historico", [])[atual.hist] : null;
+  const m = h?.resultado || {};
+  const campo = (k, rotulo) => `<label>${rotulo}<input type="number" inputmode="numeric" min="0" id="m_${k}" value="${m[k] ?? ""}"></label>`;
+  let res = "";
+  if (h?.resultado) {
+    const ie = indiceEntrega(m, atual.duracao), ap = aprendizado();
+    res = `<div class="indice"><strong>${ie.total}</strong><span>Índice de Entrega${ap && ap.n > 1 ? ` · sua média: ${Math.round(ap.media)}` : ""}</span></div>
+      <div class="medidas">${Object.entries(ie.partes).map(([k, x]) => `<div class="medida">${k} ${Math.round(x)}/${MAXI[k]}<div class="bar"><i style="width:${(x / MAXI[k]) * 100}%"></i></div></div>`).join("")}</div>`;
+  }
+  return `<section class="bloco">
+    <h2>📊 Resultado deste Reel</h2>
+    <p class="vazio" style="margin-top:6px">Depois de postar, abra o Reel no Instagram, toque em <b>Ver insights</b> e copie estes números. Com eles eu aprendo o que o seu público premia.</p>
+    ${res}
+    <div class="metricas">
+      ${campo("views", "Visualizações")}${campo("tempo", "Tempo médio assistido (s)")}${campo("envios", "Compartilhamentos")}
+      ${campo("salvos", "Salvamentos")}${campo("curtidas", "Curtidas")}${campo("comentarios", "Comentários")}
+    </div>
+    <button type="button" data-acao="resultado">${h?.resultado ? "Atualizar resultado" : "Salvar resultado"}</button>
+  </section>`;
+}
+
+function blocoLaboratorio() {
+  const ap = aprendizado(), top = campeoes(ap);
+  return `<section class="bloco">
+    <h2>🧠 O que o seu público mostrou</h2>
+    ${ap ? `<p class="vazio" style="margin-top:6px">Base: ${ap.n} Reel(s) com resultado · Índice de Entrega médio: <b>${Math.round(ap.media)}</b>. O botão <b>🎲 Roteiro viral aleatório</b> já usa isso.</p>
+      <div class="campeoes">${top.map((c) => `<div><b>melhor ${c.nome}</b>${esc(c.v)}<br><span>índice ${Math.round(c.m)} · ${c.n} Reel(s)</span></div>`).join("")}</div>`
+    : `<p class="vazio" style="margin-top:6px">Ainda sem dados. Poste um roteiro, registre os números em <b>📊 Resultado deste Reel</b>, e aqui aparecem o estilo, o objeto, o formato, a emoção e a duração que mais entregam para você.</p>`}
+    <details style="margin-top:14px"><summary><b>Como o algoritmo do Instagram decide, e o que o Roteirista faz com isso</b></summary>
+      <ol class="algoritmo">
+        <li><b>Tempo assistido.</b> É o sinal mais forte. → Gancho em até 3s, cortes a cada 3 a 5s, final que emenda no começo para o replay.</li>
+        <li><b>Envios por alcance</b> (compartilhamentos por DM). É o que mais leva o Reel a quem não te segue. → Todo roteiro tem um "gatilho de envio": para quem a pessoa vai mandar.</li>
+        <li><b>Curtidas por alcance.</b> Pesa mais para quem já te segue. → Emoção dominante, sentida, antes da informação.</li>
+        <li><b>Salvamentos e comentários.</b> Sinais de valor e conversa. → Uma ação prática curta e uma comparação que faz as pessoas contarem a versão delas.</li>
+        <li><b>Originalidade.</b> Conteúdo reciclado ou genérico é rebaixado. → Metáfora de objeto inesperado e lista de frases de IA proibidas.</li>
+        <li><b>Teste com quem não te segue.</b> Use os Reels de teste (trial reels) com os 3 ganchos sugeridos e mantenha o que segurar mais.</li>
+      </ol>
+      <p class="vazio" style="margin-top:10px">Baseado no que o Instagram divulga publicamente sobre o ranqueamento de Reels. O código do algoritmo é secreto; por isso o Roteirista também aprende com os seus números reais. As referências do Índice de Entrega (por 1.000 visualizações: ${REFS.envios} envios, ${REFS.salvos} salvamentos, ${REFS.curtidas} curtidas, ${REFS.comentarios} comentários) são metas de comparação, não números oficiais.</p>
+    </details>
+  </section>`;
+}
+
 const lacunas = (s) => esc(s).replace(/\[([^\]]+)\]/g, '<mark class="lacuna">[$1]</mark>');
 
 function salvarHistorico() {
   const h = loja.ler("historico", []);
-  h.unshift({ r: atual.r, col: atual.col, duracao: atual.duracao, briefing: atual.briefing, motor: atual.motor });
-  loja.gravar("historico", h.slice(0, 25));
+  h.unshift({ id: Date.now().toString(36), r: atual.r, col: atual.col, duracao: atual.duracao, briefing: atual.briefing, motor: atual.motor, porque: atual.porque });
+  loja.gravar("historico", h.slice(0, 80));
   atual.hist = 0;
 }
 
@@ -837,11 +1043,30 @@ $("folha").addEventListener("click", (e) => {
     criarRoteiro();
   }
   if (a === "tp") abrirTp();
+  if (a === "resultado") {
+    const m = {};
+    for (const k of ["views", "tempo", "envios", "salvos", "curtidas", "comentarios"]) m[k] = Math.max(0, +$("m_" + k).value || 0);
+    if (!m.views) { status("Preencha pelo menos as visualizações.", true); $("m_views").focus(); return; }
+    m.indice = indiceEntrega(m, atual.duracao).total;
+    const h = loja.ler("historico", []);
+    if (atual.hist == null || !h[atual.hist]) { status("Este roteiro não está no histórico.", true); return; }
+    h[atual.hist].resultado = m;
+    loja.gravar("historico", h);
+    status(`Resultado salvo: Índice de Entrega ${m.indice}. Os próximos sorteios já levam isso em conta.`);
+    const y = scrollY; render(); scrollTo(0, y);
+  }
+  if (a === "raioxNovo") {
+    // Usa o assunto da primeira frase, sem os clichês que o Raio-X apontou.
+    let tema = atual.r.cenas[0]?.fala || "";
+    for (const c of CLICHES) tema = tema.replace(new RegExp(c, "gi"), " ");
+    $("tema").value = limpar(tema.replace(/^[\s,.!?:;-]+|[\s,]+(?=[,.!?])/g, "").replace(/\s+/g, " ").trim());
+    criarViral();
+  }
   if (a === "copiar") copiar(r.cenas.map((c) => `[${tc(c.inicio)}–${tc(c.fim)}] ${c.fala}\n  Tela: ${c.texto_tela}\n  Câmera: ${c.visual}`).join("\n\n") + `\n\nCTA: ${r.cta?.fala}\nLoop: ${r.loop}`, b);
   if (a === "legenda") copiar(r.legenda, b);
   if (a === "hist") {
     const h = loja.ler("historico", [])[+b.dataset.k];
-    atual = { r: h.r, col: h.col, duracao: h.duracao, briefing: h.briefing, exemplo: false, motor: h.motor, hist: +b.dataset.k };
+    atual = { r: h.r, col: h.col, duracao: h.duracao, briefing: h.briefing, exemplo: false, motor: h.motor, porque: h.porque, hist: +b.dataset.k };
     ideias = null; render(); $("folha").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 });
@@ -894,6 +1119,15 @@ $("tempos").onclick = (e) => { const b = e.target.closest("button"); if (b) marc
 function rolar() { col = colidir(novaSemente()); mostrarDado(); }
 $("rolar").onclick = rolar;
 $("briefing").onsubmit = (e) => { e.preventDefault(); if (!ocupado) criarRoteiro(); };
+$("viral").onclick = () => { if (!ocupado) criarViral(); };
+$("analisar").onclick = () => {
+  const texto = $("raioxTexto").value.trim();
+  if (palavras(texto) < 5) { status("Cole um texto com pelo menos uma frase completa.", true); return; }
+  const r = raioX(texto);
+  atual = { r, col: col, duracao: 40, exemplo: false, motor: true, raiox: true };
+  ideias = null; status(""); render();
+  $("folha").scrollIntoView({ behavior: "smooth", block: "start" });
+};
 $("semIdeia").onclick = () => { if (!ocupado) { $("tema").value = ""; gerarIdeias(); } };
 ["nicho", "publico", "tom"].forEach((k) => { $(k).value = loja.ler("campo_" + k, ""); $(k).addEventListener("change", () => loja.gravar("campo_" + k, $(k).value)); });
 

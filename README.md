@@ -5,6 +5,9 @@ Agente de roteiros de Reels de até 40 segundos, guiado pelo algoritmo do Instag
 - Escreve **todas as falas**, prontas para o teleprompter, e a **direção de câmera** de cada cena.
 - Falas fora da caixa: cada roteiro explica o assunto com um objeto do dia a dia que não tem nada a ver com o nicho.
 - Funciona para **qualquer pessoa**: sem cadastro, sem chave de API e sem custo por roteiro. Tudo roda no navegador de quem usa.
+- **🎲 Roteiro viral aleatório:** sorteia tema, estilo, objeto, formato e duração, puxando para o que já entregou mais com o seu público (80%) e testando o novo (20%).
+- **📊 Aprende com os seus Reels:** você anota 6 números do Insights e o Roteirista calcula um Índice de Entrega e descobre o que o seu público premia.
+- **🔬 Raio-X:** cole o texto de qualquer Reel e veja como ele se sai nos sinais do algoritmo.
 - Servidor de um arquivo só (`servidor.js`), sem dependências, com tela de login.
 
 ## Subir no seu servidor (Docker)
