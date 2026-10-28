@@ -1,0 +1,39 @@
+# Roteirista 40s na Hostinger (VPS com Docker Manager), sem mexer no site principal.
+#
+# Como usar: no painel da Hostinger, VPS > Docker Manager > Compose,
+# cole este arquivo inteiro e clique em Deploy.
+# Depois abra http://IP-DO-SEU-VPS:8081
+#
+# Por que não afeta o site principal:
+# - não usa as portas 80 e 443 (ficam livres para o seu site);
+# - tem nome de projeto, container e rede próprios;
+# - limite de memória e CPU, para nunca disputar recursos com o site.
+
+name: roteirista-40s
+
+services:
+  roteirista:
+    # Monta a imagem direto do GitHub, sem precisar clonar nada no VPS.
+    build:
+      context: https://github.com/wyterlin1-svg/Roteiro-Assistente-.git#claude/roteirista-40s
+    image: roteirista-40s:latest
+    container_name: roteirista-40s
+    restart: unless-stopped
+    ports:
+      - "8081:80"   # se a 8081 estiver ocupada, troque só o primeiro número (ex.: "8090:80")
+    networks:
+      - roteirista
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/saude"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  roteirista:
+    name: roteirista-40s

@@ -28,6 +28,12 @@ docker run -d --name roteirista-40s --restart unless-stopped -p 8080:80 roteiris
 
 Para usar outra porta, troque o `8080` no `docker-compose.yml` (ou no `-p`).
 
+## Hostinger (sem afetar o site principal)
+
+Use o arquivo [`hostinger.yml`](hostinger.yml): no painel da Hostinger, abra **VPS > Docker Manager > Compose**, cole o conteúdo inteiro e clique em **Deploy**. Ele monta o container direto do GitHub, usa a porta **8081** (as portas 80 e 443 do seu site ficam livres) e tem rede, nome e limite de memória próprios.
+
+Depois abra `http://IP-DO-SEU-VPS:8081`.
+
 ## Atualizar
 
 ```bash
