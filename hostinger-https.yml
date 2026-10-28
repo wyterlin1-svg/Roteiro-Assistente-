@@ -1,0 +1,53 @@
+# Roteirista 40s na Hostinger com subdomínio e HTTPS, pelo Traefik que já roda no VPS.
+#
+# Antes de implantar, troque os 4 itens marcados com <<< (copie os valores do YAML do seu n8n):
+#   roteiros.seudominio.com  -> o seu subdomínio
+#   REDE_DO_TRAEFIK          -> a rede que o n8n usa (seção "networks" do YAML do n8n)
+#   ENTRADA_HTTPS            -> o valor de "entrypoints" nas labels do n8n (ex.: websecure)
+#   RESOLVEDOR               -> o valor de "certresolver" nas labels do n8n (ex.: letsencrypt)
+# E troque as senhas da linha USUARIOS.
+#
+# Não abre nenhuma porta no VPS: o acesso passa só pelo Traefik, com HTTPS.
+
+services:
+  roteirista:
+    image: node:22-alpine
+    container_name: roteirista-40s
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+    environment:
+      USUARIOS: "admin:TroqueEstaSenha123,cliente1:OutraSenha456"
+      NODE_ENV: production
+      COOKIE_SEGURO: "1"
+    user: node
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        RAW=https://raw.githubusercontent.com/wyterlin1-svg/Roteiro-Assistente-/refs/heads/claude/roteirista-40s
+        mkdir -p /home/node/app/public && cd /home/node/app
+        wget -qO servidor.js "$$RAW/servidor.js"
+        wget -qO public/index.html "$$RAW/public/index.html"
+        wget -qO public/login.html "$$RAW/public/login.html"
+        exec node servidor.js
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/saude"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks:
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=REDE_DO_TRAEFIK                                   # <<<
+      - traefik.http.routers.roteirista.rule=Host(`roteiros.seudominio.com`)     # <<<
+      - traefik.http.routers.roteirista.entrypoints=ENTRADA_HTTPS                # <<<
+      - traefik.http.routers.roteirista.tls=true
+      - traefik.http.routers.roteirista.tls.certresolver=RESOLVEDOR              # <<<
+      - traefik.http.services.roteirista.loadbalancer.server.port=3000
+
+networks:
+  traefik:
+    external: true
+    name: REDE_DO_TRAEFIK                                                        # <<<
