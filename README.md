@@ -48,21 +48,11 @@ Use [`hostinger-https.yml`](hostinger-https.yml) no lugar do `hostinger.yml`. El
 
 ## Atualizar
 
-```bash
-cd roteirista
-git pull
-docker compose up -d --build
-```
+**Automático.** A cada 5 minutos o servidor confere o GitHub:
+- página e tela de login novas entram na hora, sem reiniciar e sem deslogar ninguém;
+- um servidor novo só é instalado se passar na checagem de erros, e aí o container reinicia sozinho (as sessões continuam, o segredo fica salvo junto dos dados).
 
-## Domínio com HTTPS (opcional)
-
-Aponte o domínio para o servidor e coloque um proxy na frente do container. Com o [Caddy](https://caddyserver.com), que emite o certificado sozinho, o `/etc/caddy/Caddyfile` fica assim:
-
-```
-roteiros.seudominio.com {
-    reverse_proxy 127.0.0.1:8080
-}
-```
+Variáveis opcionais: `ATUALIZACAO=0` desliga, `ATUALIZACAO_MINUTOS=10` muda o intervalo.
 
 ## Verificar se está no ar
 

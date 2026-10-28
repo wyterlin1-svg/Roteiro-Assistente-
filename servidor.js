@@ -2,18 +2,26 @@
 // Acessos na variável USUARIOS="usuario:senha,outro:senha2".
 // As senhas viram hash scrypt na memória ao ligar; a sessão é um cookie assinado (7 dias).
 import { createServer } from "node:http";
-import { readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from "node:crypto";
 
 const PORTA = Number(process.env.PORT) || 3000;
 const PASTA = process.env.PAGINAS || join(import.meta.dirname, "public");
-const SEGREDO = process.env.SEGREDO_SESSAO || randomBytes(32).toString("hex");
 const DURACAO = 7 * 24 * 3600 * 1000;
 const COOKIE = "r40s";
 // Dados de cada usuário (histórico, resultados dos Reels, aprendizado): um arquivo JSON por pessoa.
 const DADOS = process.env.DADOS || join(import.meta.dirname, "dados");
 mkdirSync(DADOS, { recursive: true });
+// O segredo das sessões fica guardado junto dos dados: reiniciar ou atualizar não desloga ninguém.
+function carregarSegredo() {
+  if (process.env.SEGREDO_SESSAO) return process.env.SEGREDO_SESSAO;
+  const arq = join(DADOS, ".segredo");
+  if (!existsSync(arq)) writeFileSync(arq, randomBytes(32).toString("hex"), { mode: 0o600 });
+  return readFileSync(arq, "utf8").trim();
+}
+const SEGREDO = carregarSegredo();
 const LIMITE_DADOS = 5 * 1024 * 1024;
 
 // ---- Acessos ----
@@ -71,8 +79,8 @@ function errou(ip) {
 }
 
 // ---- Páginas ----
-const LOGIN = readFileSync(join(PASTA, "login.html"));
-const APP = readFileSync(join(PASTA, "index.html"), "utf8");
+let LOGIN = readFileSync(join(PASTA, "login.html"), "utf8");
+let APP = readFileSync(join(PASTA, "index.html"), "utf8");
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // Botão de sair, colocado sobre a página do Roteirista só quando servida por aqui.
 const comSair = (nome) => APP.replace("</body>", `<a href="/sair" id="sair-sessao" style="position:fixed;z-index:10;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));font:600 13px var(--f-body,system-ui);color:var(--fg,#16141f);background:var(--surface,#fff);border:1px solid var(--line,#dcdbe6);border-radius:99px;padding:8px 14px;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.08)">${esc(nome)} · Sair</a>\n</body>`);
@@ -160,3 +168,47 @@ createServer(async (req, res) => {
     enviar(res, 500, "Erro interno", { "content-type": "text/plain; charset=utf-8" });
   }
 }).listen(PORTA, () => console.log(`Roteirista 40s na porta ${PORTA}. Acessos: ${[...usuarios.keys()].join(", ")}. Dados em ${DADOS}`));
+
+// ---- Atualização automática ----
+// A cada poucos minutos confere o GitHub. Páginas novas entram na hora, sem reiniciar;
+// um servidor novo só é instalado se passar na checagem de sintaxe, e aí o processo
+// reinicia sozinho (o Docker o liga de novo). Desligue com ATUALIZACAO=0.
+const FONTE = process.env.ATUALIZACAO_URL || "https://raw.githubusercontent.com/wyterlin1-svg/Roteiro-Assistente-/refs/heads/claude/roteirista-40s";
+const INTERVALO = Math.max(0.05, Number(process.env.ATUALIZACAO_MINUTOS) || 5) * 60000;
+const ESTE_ARQUIVO = join(import.meta.dirname, "servidor.js");
+
+async function buscar(caminho) {
+  const r = await fetch(`${FONTE}/${caminho}?v=${Date.now()}`, { cache: "no-store", signal: AbortSignal.timeout(20000) });
+  if (!r.ok) throw new Error(`${caminho}: HTTP ${r.status}`);
+  return r.text();
+}
+function gravar(destino, texto) {
+  writeFileSync(destino + ".novo", texto);
+  renameSync(destino + ".novo", destino);
+}
+async function atualizar() {
+  try {
+    const [pagina, login, servidor] = await Promise.all(["public/index.html", "public/login.html", "servidor.js"].map(buscar));
+    // Só aceita arquivos que parecem completos: uma resposta cortada nunca derruba o site.
+    if (pagina.includes("</html>") && pagina.includes("Roteirista") && pagina !== APP) {
+      gravar(join(PASTA, "index.html"), pagina); APP = pagina; console.log("Atualizado: página do Roteirista");
+    }
+    if (login.includes("</html>") && login.includes("/entrar") && login !== LOGIN) {
+      gravar(join(PASTA, "login.html"), login); LOGIN = login; console.log("Atualizado: tela de login");
+    }
+    if (servidor !== readFileSync(ESTE_ARQUIVO, "utf8")) {
+      const teste = ESTE_ARQUIVO + ".teste.js";
+      writeFileSync(teste, servidor);
+      if (spawnSync(process.execPath, ["--check", teste]).status !== 0) {
+        console.error("Atualização do servidor ignorada: o arquivo novo tem erro.");
+        return;
+      }
+      renameSync(teste, ESTE_ARQUIVO);
+      console.log("Atualizado: servidor. Reiniciando para aplicar…");
+      setTimeout(() => process.exit(0), 300);
+    }
+  } catch (e) {
+    console.error(`Não consegui verificar atualizações agora (${e.message}). Tento de novo depois.`);
+  }
+}
+if (process.env.ATUALIZACAO !== "0") setInterval(atualizar, INTERVALO).unref();
