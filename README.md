@@ -28,11 +28,16 @@ docker run -d --name roteirista-40s --restart unless-stopped -p 8080:80 roteiris
 
 Para usar outra porta, troque o `8080` no `docker-compose.yml` (ou no `-p`).
 
-## Hostinger (sem afetar o site principal)
+## Hostinger, com login e senha (sem afetar o site principal)
 
-Use o arquivo [`hostinger.yml`](hostinger.yml): no painel da Hostinger, abra **VPS > Docker Manager > Compose**, cole o conteúdo inteiro e clique em **Deploy**. Ele usa a imagem oficial do nginx e baixa a página do GitHub ao ligar (para atualizar, é só reiniciar o container), usa a porta **8081** (as portas 80 e 443 do seu site ficam livres) e tem rede, nome e limite de memória próprios.
+Use o arquivo [`hostinger.yml`](hostinger.yml): no painel da Hostinger, abra **VPS > Docker Manager**, crie um projeto, cole o conteúdo inteiro e clique em **Implantar**.
 
-Depois abra `http://IP-DO-SEU-VPS:8081`.
+- **Acessos:** edite a linha `USUARIOS` no formato `usuario:senha`, separando as pessoas por vírgula (sem espaços e sem vírgula dentro da senha). Para adicionar ou remover alguém, edite a linha e implante de novo.
+- As senhas ficam criptografadas dentro do container, e tentativas em excesso são freadas.
+- Usa a imagem oficial do nginx e baixa a página do GitHub ao ligar: para atualizar, basta reiniciar o container.
+- Usa a porta **8081**; as portas 80 e 443 do seu site ficam livres.
+
+Depois abra `http://IP-DO-SEU-VPS:8081` e entre com um dos acessos.
 
 ## Atualizar
 
