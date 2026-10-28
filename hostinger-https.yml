@@ -1,21 +1,25 @@
-# Roteirista 40s na Hostinger com subdomínio e HTTPS, pelo Traefik que já roda no VPS.
+# Roteirista 40s na Hostinger com subdomínio e HTTPS, no mesmo padrão do n8n
+# (Traefik da Hostinger: entrypoint "websecure" e certresolver "letsencrypt").
 #
-# Antes de implantar, troque os 4 itens marcados com <<< (copie os valores do YAML do seu n8n):
-#   roteiros.seudominio.com  -> o seu subdomínio
-#   REDE_DO_TRAEFIK          -> a rede que o n8n usa (seção "networks" do YAML do n8n)
-#   ENTRADA_HTTPS            -> o valor de "entrypoints" nas labels do n8n (ex.: websecure)
-#   RESOLVEDOR               -> o valor de "certresolver" nas labels do n8n (ex.: letsencrypt)
-# E troque as senhas da linha USUARIOS.
-#
-# Não abre nenhuma porta no VPS: o acesso passa só pelo Traefik, com HTTPS.
+# Antes de implantar, troque:
+#   roteiros.seudominio.com  -> o seu subdomínio (aparece 1 vez)
+#   as senhas da linha USUARIOS
 
 services:
   roteirista:
     image: node:22-alpine
     container_name: roteirista-40s
     restart: unless-stopped
+    ports:
+      - "8081:3000"
     mem_limit: 128m
     cpus: 0.25
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.roteirista.rule=Host(`roteiros.seudominio.com`)
+      - traefik.http.routers.roteirista.entrypoints=websecure
+      - traefik.http.routers.roteirista.tls.certresolver=letsencrypt
+      - traefik.http.services.roteirista.loadbalancer.server.port=3000
     environment:
       USUARIOS: "admin:TroqueEstaSenha123,cliente1:OutraSenha456"
       NODE_ENV: production
@@ -36,18 +40,3 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
-    networks:
-      - traefik
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=REDE_DO_TRAEFIK                                   # <<<
-      - traefik.http.routers.roteirista.rule=Host(`roteiros.seudominio.com`)     # <<<
-      - traefik.http.routers.roteirista.entrypoints=ENTRADA_HTTPS                # <<<
-      - traefik.http.routers.roteirista.tls=true
-      - traefik.http.routers.roteirista.tls.certresolver=RESOLVEDOR              # <<<
-      - traefik.http.services.roteirista.loadbalancer.server.port=3000
-
-networks:
-  traefik:
-    external: true
-    name: REDE_DO_TRAEFIK                                                        # <<<

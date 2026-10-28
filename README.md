@@ -41,7 +41,7 @@ Depois abra `http://IP-DO-SEU-VPS:8081`.
 
 ## Subdomínio com HTTPS (Traefik)
 
-Use [`hostinger-https.yml`](hostinger-https.yml) no lugar do `hostinger.yml`. Antes de implantar, troque os itens marcados com `<<<`: o subdomínio e três valores que você copia das labels do seu n8n (rede do Traefik, entrypoint HTTPS e certresolver). Crie também um registro DNS do tipo **A** do subdomínio apontando para o IP do VPS.
+Use [`hostinger-https.yml`](hostinger-https.yml) no lugar do `hostinger.yml`. Ele segue o mesmo padrão de labels do n8n da Hostinger (entrypoint `websecure`, certresolver `letsencrypt`). Antes de implantar, troque o subdomínio e as senhas. Crie também um registro DNS do tipo **A** do subdomínio apontando para o IP do VPS.
 
 ## Atualizar
 
