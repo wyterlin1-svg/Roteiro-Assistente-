@@ -6,6 +6,7 @@
 # Para adicionar ou tirar alguém: edite a linha e implante de novo.
 #
 # Não precisa montar imagem: usa o Node oficial e baixa os arquivos do GitHub ao ligar.
+# Os dados de cada usuário ficam no volume roteirista_dados e não se perdem ao reimplantar.
 # Para atualizar, basta reiniciar o container.
 
 services:
@@ -20,7 +21,10 @@ services:
     environment:
       USUARIOS: "admin:TroqueEstaSenha123,cliente1:OutraSenha456"
       NODE_ENV: production
+      DADOS: /home/node/dados
     user: node
+    volumes:
+      - roteirista_dados:/home/node   # histórico e resultados de cada usuário: sobrevivem a reinícios e reimplantações
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -36,3 +40,6 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
+
+volumes:
+  roteirista_dados:

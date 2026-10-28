@@ -2,7 +2,7 @@
 // Acessos na variável USUARIOS="usuario:senha,outro:senha2".
 // As senhas viram hash scrypt na memória ao ligar; a sessão é um cookie assinado (7 dias).
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from "node:crypto";
 
@@ -11,6 +11,10 @@ const PASTA = process.env.PAGINAS || join(import.meta.dirname, "public");
 const SEGREDO = process.env.SEGREDO_SESSAO || randomBytes(32).toString("hex");
 const DURACAO = 7 * 24 * 3600 * 1000;
 const COOKIE = "r40s";
+// Dados de cada usuário (histórico, resultados dos Reels, aprendizado): um arquivo JSON por pessoa.
+const DADOS = process.env.DADOS || join(import.meta.dirname, "dados");
+mkdirSync(DADOS, { recursive: true });
+const LIMITE_DADOS = 5 * 1024 * 1024;
 
 // ---- Acessos ----
 const usuarios = new Map();
@@ -80,6 +84,24 @@ function enviar(res, status, corpo, extra = {}) {
 }
 const ir = (res, para, extra = {}) => enviar(res, 303, "", { location: para, ...extra });
 
+const arquivoDe = (nome) => join(DADOS, Buffer.from(nome).toString("hex") + ".json");
+function lerDados(nome) {
+  try { return readFileSync(arquivoDe(nome), "utf8"); } catch { return "{}"; }
+}
+function gravarDados(nome, texto) {
+  const destino = arquivoDe(nome), tmp = destino + ".tmp";
+  writeFileSync(tmp, texto);
+  renameSync(tmp, destino); // troca atômica: nunca fica um arquivo pela metade
+}
+async function lerCorpo(req, limite) {
+  let corpo = "";
+  for await (const parte of req) {
+    corpo += parte;
+    if (corpo.length > limite) return null;
+  }
+  return corpo;
+}
+
 async function lerFormulario(req) {
   let corpo = "";
   for await (const parte of req) {
@@ -112,6 +134,24 @@ createServer(async (req, res) => {
     if (pathname === "/entrar") return quem ? ir(res, "/") : enviar(res, 200, LOGIN, { "content-type": "text/html; charset=utf-8" });
     if (pathname === "/sair") return ir(res, "/entrar?saiu=1", { "set-cookie": cookie(req, "", 0) });
 
+    if (pathname === "/api/dados") {
+      const json = { "content-type": "application/json; charset=utf-8" };
+      if (!quem) return enviar(res, 401, '{"erro":"sessao"}', json);
+      if (req.method === "GET") return enviar(res, 200, lerDados(quem), json);
+      if (req.method === "PUT") {
+        // Exigir JSON impede que outros sites enviem formulários para cá.
+        if (!String(req.headers["content-type"]).startsWith("application/json")) return enviar(res, 415, '{"erro":"json"}', json);
+        const corpo = await lerCorpo(req, LIMITE_DADOS);
+        if (corpo === null) return enviar(res, 413, '{"erro":"grande demais"}', json);
+        let dados;
+        try { dados = JSON.parse(corpo); } catch { return enviar(res, 400, '{"erro":"json invalido"}', json); }
+        if (!dados || typeof dados !== "object" || Array.isArray(dados)) return enviar(res, 400, '{"erro":"formato"}', json);
+        gravarDados(quem, JSON.stringify(dados));
+        return enviar(res, 200, '{"ok":true}', json);
+      }
+      return enviar(res, 405, '{"erro":"metodo"}', json);
+    }
+
     if (!quem) return ir(res, "/entrar");
     if (pathname === "/" || pathname === "/index.html") return enviar(res, 200, comSair(quem), { "content-type": "text/html; charset=utf-8" });
     return ir(res, "/");
@@ -119,4 +159,4 @@ createServer(async (req, res) => {
     console.error(e);
     enviar(res, 500, "Erro interno", { "content-type": "text/plain; charset=utf-8" });
   }
-}).listen(PORTA, () => console.log(`Roteirista 40s na porta ${PORTA}. Acessos: ${[...usuarios.keys()].join(", ")}`));
+}).listen(PORTA, () => console.log(`Roteirista 40s na porta ${PORTA}. Acessos: ${[...usuarios.keys()].join(", ")}. Dados em ${DADOS}`));

@@ -624,7 +624,46 @@ function motorIdeias(b) {
 // ===== Estado e utilidades =====
 const $ = (id) => document.getElementById(id);
 const esc = (s = "") => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const loja = { ler(k, p) { try { return JSON.parse(localStorage.getItem(k)) ?? p; } catch { return p; } }, gravar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+// Dados guardados no navegador e, quando a página roda no seu servidor, também nele
+// (um arquivo por usuário). No artefato do Claude não há servidor: fica só no navegador.
+const SINCRONIZADOS = ["historico", "campo_nicho", "campo_publico", "campo_tom"];
+let noServidor = false, envioAgendado = null;
+const loja = {
+  ler(k, p) { try { return JSON.parse(localStorage.getItem(k)) ?? p; } catch { return p; } },
+  gravar(k, v) {
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+    if (noServidor && SINCRONIZADOS.includes(k)) { clearTimeout(envioAgendado); envioAgendado = setTimeout(enviarAoServidor, 600); }
+  },
+};
+async function enviarAoServidor() {
+  const dados = {};
+  for (const k of SINCRONIZADOS) dados[k] = loja.ler(k, null);
+  try {
+    const r = await fetch("/api/dados", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(dados) });
+    if (r.status === 401) { status("Sua sessão expirou. Entre de novo para salvar no servidor.", true); return; }
+    if (!r.ok) throw new Error(r.status);
+    $("modo").textContent = "salvo no servidor";
+  } catch {
+    status("Não consegui salvar no servidor agora. Os dados ficaram neste aparelho e vão junto no próximo salvamento.", true);
+  }
+}
+async function carregarDoServidor() {
+  let dados;
+  try {
+    const r = await fetch("/api/dados", { cache: "no-store" });
+    if (!r.ok || !String(r.headers.get("content-type")).includes("json")) return;
+    dados = await r.json();
+  } catch { return; } // sem servidor (artefato): segue só com o navegador
+  noServidor = true;
+  if (Array.isArray(dados.historico)) {
+    for (const k of SINCRONIZADOS) if (dados[k] != null) try { localStorage.setItem(k, JSON.stringify(dados[k])); } catch {}
+    for (const k of ["nicho", "publico", "tom"]) if (dados["campo_" + k] != null && !$(k).value) $(k).value = dados["campo_" + k];
+    if (!ocupado && !atual.raiox) { if (atual.hist != null) atual.hist = null; render(); }
+  } else if (loja.ler("historico", []).length) {
+    enviarAoServidor(); // primeira vez no servidor: leva o que já estava neste aparelho
+  }
+  $("modo").textContent = "salvo no servidor";
+}
 const tc = (s) => `00:${String(s).padStart(2, "0")}`;
 let col = colidir(novaSemente());
 let duracao = 30;
@@ -1134,11 +1173,13 @@ $("semIdeia").onclick = () => { if (!ocupado) { $("tema").value = ""; gerarIdeia
 mostrarDado();
 render();
 
+carregarDoServidor();
+
 // O motor próprio funciona para qualquer pessoa. Quem abre logado no Claude também pode usar a IA.
 (async () => {
   sample = window.claude ? await window.claude.use("sample").catch(() => null) : null;
   $("motorBox").hidden = !sample;
-  $("modo").textContent = sample ? "ia do claude disponível" : "pronto para criar";
+  if (!noServidor) $("modo").textContent = sample ? "ia do claude disponível" : "pronto para criar";
 })();
 </script>
 </body>
