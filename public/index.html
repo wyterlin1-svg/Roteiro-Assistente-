@@ -154,7 +154,8 @@
   .reel-acoes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 13px; }
   .reel-acoes a { color: var(--accent); font-weight: 600; }
   .reel-acoes select { width: auto; max-width: 100%; padding: 6px 8px; font-size: 13px; }
-  .ig code { font-family: var(--f-mono); font-size: 12px; }
+  .ig code { font-family: var(--f-mono); font-size: 12px; word-break: break-all; }
+  .aviso-ig { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 14px; color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
   .ideias { display: grid; gap: 10px; }
   .ideia { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; background: var(--surface); }
   .ideia h3 { margin: 0; font: 700 17px var(--f-display); }
@@ -961,9 +962,11 @@ function blocoInstagram() {
   if (!noServidor) return "";
   if (!ig) return "";
   if (!ig.configurado) return `<div class="ig"><b>📱 Instagram</b><p class="vazio">A conexão com o Instagram ainda não foi ativada neste servidor. O administrador precisa criar um app na Meta e colocar <code>INSTAGRAM_APP_ID</code> e <code>INSTAGRAM_APP_SECRET</code> no YAML.</p></div>`;
-  if (!ig.conectado) return `<div class="ig"><b>📱 Instagram</b>
+  const falha = ig.falha ? `<p class="aviso-ig"><b>Última tentativa não deu certo.</b> ${esc(ig.falha)}</p>` : "";
+  if (!ig.conectado) return `<div class="ig"><b>📱 Instagram</b>${falha}
     <p class="vazio">Conecte sua conta profissional (criador ou empresa) e eu analiso seus Reels de verdade: alcance, tempo assistido, compartilhamentos, salvamentos e taxa de pulos. Só leitura: o Roteirista nunca posta nada.</p>
-    <a class="botao-ig" href="/instagram/conectar">Conectar Instagram</a></div>`;
+    <a class="botao-ig" href="/instagram/conectar">Conectar Instagram</a>
+    <p class="vazio">Endereço de retorno para cadastrar no app da Meta: <code>${esc(ig.retorno || "")}</code></p></div>`;
   const a = analisarInstagram();
   const hist = loja.ler("historico", []).map((h, i) => ({ h, i })).filter(({ h }) => !h.resultado && h.r?.genes);
   const quando = ig.atualizado ? new Date(ig.atualizado).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "nunca";

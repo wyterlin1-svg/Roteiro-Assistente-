@@ -161,7 +161,7 @@ createServer(async (req, res) => {
     }
 
     if (pathname.startsWith("/instagram/") || pathname.startsWith("/api/instagram")) {
-      if (!quem) return pathname.startsWith("/api/") ? enviar(res, 401, '{"erro":"sessao"}', { "content-type": "application/json" }) : ir(res, "/entrar");
+      if (!quem && pathname !== "/instagram/retorno") return pathname.startsWith("/api/") ? enviar(res, 401, '{"erro":"sessao"}', { "content-type": "application/json" }) : ir(res, "/entrar");
       // Ações que mudam algo exigem JSON, para outros sites não conseguirem dispará-las.
       if (req.method === "POST" && !String(req.headers["content-type"]).startsWith("application/json")) return enviar(res, 415, '{"erro":"json"}', { "content-type": "application/json" });
       if ((await rotasInstagram(req, res, pathname, quem)) !== false) return;
@@ -203,10 +203,26 @@ async function igPedir(url, opcoes) {
 
 // O "state" amarra o retorno do Instagram ao usuário logado e expira em 10 minutos.
 const igState = (nome) => { const c = `${Buffer.from(nome).toString("base64url")}.${Date.now() + 600000}`; return `${c}.${assinar(c)}`; };
-function igConferirState(state, nome) {
+// Devolve o usuário dono do "state" (assinado pelo servidor), ou null se adulterado ou vencido.
+// Assim a volta do Instagram funciona mesmo quando o login acontece no app do Instagram
+// e a página volta num navegador sem a sessão do Roteirista.
+function igDonoDoState(state) {
   const [n, exp, ass] = String(state).split(".");
-  if (!ass || assinar(`${n}.${exp}`) !== ass || Number(exp) < Date.now()) return false;
-  return Buffer.from(n, "base64url").toString() === nome;
+  if (!ass || assinar(`${n}.${exp}`) !== ass || Number(exp) < Date.now()) return null;
+  const nome = Buffer.from(n, "base64url").toString();
+  return usuarios.has(nome) ? nome : null;
+}
+
+// Última falha de conexão de cada usuário, para mostrar o motivo no painel.
+const igFalhas = new Map();
+function igMotivo(msg = "") {
+  const m = msg.toLowerCase();
+  if (m.includes("redirect")) return "O endereço de retorno não confere. No app da Meta, em Configurar login comercial do Instagram, a URI de redirecionamento precisa ser exatamente o endereço de retorno mostrado no painel do Roteirista.";
+  if (m.includes("developer role") || m.includes("tester") || m.includes("permission")) return "Esta conta do Instagram ainda não tem acesso ao app. Adicione-a em Funções do app > Testadores do Instagram e aceite o convite no Instagram (Configurações > Apps e sites > Convites de testador).";
+  if (m.includes("platform app") || m.includes("client_id") || m.includes("app id") || m.includes("client secret") || m.includes("secret")) return "ID ou chave secreta do app não conferem. Use o ID do app do *Instagram* e a chave secreta do *Instagram* (em API do Instagram > Configurar com login do Instagram), não os do Facebook.";
+  if (m.includes("code") && (m.includes("used") || m.includes("expired") || m.includes("invalid"))) return "O código do Instagram expirou ou já foi usado. Clique em Conectar Instagram de novo.";
+  if (m.includes("professional") || m.includes("business") || m.includes("creator")) return "A conta precisa ser profissional (criador ou empresa). No Instagram: Configurações > Tipo de conta e ferramentas.";
+  return `O Instagram recusou a conexão: ${msg}`;
 }
 
 async function igConectar(nome, code, req) {
@@ -272,22 +288,30 @@ async function rotasInstagram(req, res, pathname, quem) {
   }
   if (pathname === "/instagram/retorno") {
     const q = new URL(req.url, "http://x").searchParams;
-    if (q.get("error") || !q.get("code")) return ir(res, "/?instagram=cancelado");
-    if (!igConferirState(q.get("state"), quem)) return ir(res, "/?instagram=expirou");
+    const dono = igDonoDoState(q.get("state"));
+    const destino = (r) => ir(res, (quem ? "/" : "/entrar") + "?instagram=" + r);
+    if (!dono || (quem && dono !== quem)) { console.error("Retorno do Instagram com state inválido ou vencido."); return destino("expirou"); }
+    if (q.get("error") || !q.get("code")) {
+      console.log(`Conexão com o Instagram cancelada (${dono}): ${q.get("error_description") || q.get("error") || "sem código"}`);
+      igFalhas.set(dono, igMotivo(q.get("error_description") || "conexão cancelada no Instagram"));
+      return destino("cancelado");
+    }
     try {
-      await igConectar(quem, q.get("code").replace(/#_$/, ""), req);
-      console.log(`Instagram conectado: ${quem}`);
-      await igImportar(quem).catch((e) => console.error(`Importação inicial falhou (${quem}): ${e.message}`));
-      return ir(res, "/?instagram=conectado");
+      await igConectar(dono, q.get("code").replace(/#_$/, ""), req);
+      igFalhas.delete(dono);
+      console.log(`Instagram conectado: ${dono}`);
+      await igImportar(dono).catch((e) => console.error(`Importação inicial falhou (${dono}): ${e.message}`));
+      return destino("conectado");
     } catch (e) {
-      console.error(`Falha ao conectar Instagram (${quem}): ${e.message}`);
-      return ir(res, "/?instagram=erro");
+      console.error(`Falha ao conectar Instagram (${dono}): ${e.message}`);
+      igFalhas.set(dono, igMotivo(e.message));
+      return destino("erro");
     }
   }
   if (pathname === "/api/instagram" && req.method === "GET") {
     const conta = lerJson(arquivoDe(quem, ".ig"));
     const dados = lerJson(arquivoDe(quem, ".reels"));
-    return enviar(res, 200, JSON.stringify({ configurado: igConfigurado(), conectado: !!conta, usuario: conta?.usuario || null, ...(dados && { atualizado: dados.atualizado, seguidores: dados.seguidores, reels: dados.reels }) }), json);
+    return enviar(res, 200, JSON.stringify({ configurado: igConfigurado(), conectado: !!conta, usuario: conta?.usuario || null, falha: igFalhas.get(quem) || null, retorno: igRetorno(req), ...(dados && { atualizado: dados.atualizado, seguidores: dados.seguidores, reels: dados.reels }) }), json);
   }
   if (pathname === "/api/instagram/atualizar" && req.method === "POST") {
     try { return enviar(res, 200, JSON.stringify(await igImportar(quem)), json); }

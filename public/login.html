@@ -88,7 +88,8 @@
 <script>
   const q = new URLSearchParams(location.search), aviso = document.getElementById("aviso");
   const msgs = { "1": ["erro", "Usuário ou senha incorretos."], bloqueado: ["erro", "Muitas tentativas erradas. Espere 15 minutos e tente de novo."] };
-  const m = q.get("saiu") ? ["ok", "Você saiu. Até o próximo roteiro."] : msgs[q.get("erro")];
+  const igMsgs = { conectado: ["ok", "Instagram conectado. Entre para ver a análise dos seus Reels."], erro: ["erro", "O Instagram recusou a conexão. Entre para ver o motivo no painel."], cancelado: ["erro", "Conexão com o Instagram cancelada."], expirou: ["erro", "A conexão com o Instagram demorou demais. Entre e tente de novo."] };
+  const m = q.get("saiu") ? ["ok", "Você saiu. Até o próximo roteiro."] : msgs[q.get("erro")] || igMsgs[q.get("instagram")];
   if (m) { aviso.className = "aviso " + m[0]; aviso.textContent = m[1]; aviso.hidden = false; }
 
   const ver = document.getElementById("ver"), senha = document.getElementById("senha");
