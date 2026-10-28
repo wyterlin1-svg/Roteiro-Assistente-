@@ -1,39 +1,27 @@
-# Roteirista 40s na Hostinger (VPS com Docker Manager), sem mexer no site principal.
+# Roteirista 40s na Hostinger (VPS > Docker Manager > Compose), sem mexer no site principal.
+# Cole este arquivo inteiro e clique em Deploy. Depois abra http://IP-DO-SEU-VPS:8081
 #
-# Como usar: no painel da Hostinger, VPS > Docker Manager > Compose,
-# cole este arquivo inteiro e clique em Deploy.
-# Depois abra http://IP-DO-SEU-VPS:8081
-#
-# Por que não afeta o site principal:
-# - não usa as portas 80 e 443 (ficam livres para o seu site);
-# - tem nome de projeto, container e rede próprios;
-# - limite de memória e CPU, para nunca disputar recursos com o site.
-
-name: roteirista-40s
+# Não precisa montar imagem: usa o nginx oficial e baixa a página do GitHub ao ligar.
+# Para atualizar a página no futuro, basta reiniciar o container.
+# Não afeta o site principal: não usa as portas 80/443 e tem memória limitada.
 
 services:
   roteirista:
-    # Monta a imagem direto do GitHub, sem precisar clonar nada no VPS.
-    build:
-      context: https://github.com/wyterlin1-svg/Roteiro-Assistente-.git#claude/roteirista-40s
-    image: roteirista-40s:latest
+    image: nginx:1.27-alpine
     container_name: roteirista-40s
     restart: unless-stopped
     ports:
       - "8081:80"   # se a 8081 estiver ocupada, troque só o primeiro número (ex.: "8090:80")
-    networks:
-      - roteirista
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 64M
+    mem_limit: 64m
+    cpus: 0.25
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        wget -qO /usr/share/nginx/html/index.html
+        https://raw.githubusercontent.com/wyterlin1-svg/Roteiro-Assistente-/refs/heads/claude/roteirista-40s/public/index.html
+        && exec nginx -g 'daemon off;'
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/saude"]
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/"]
       interval: 30s
       timeout: 3s
       retries: 3
-
-networks:
-  roteirista:
-    name: roteirista-40s
