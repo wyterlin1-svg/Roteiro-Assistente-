@@ -20,14 +20,13 @@ services:
     environment:
       USUARIOS: "admin:TroqueEstaSenha123,cliente1:OutraSenha456"
       NODE_ENV: production
-    working_dir: /app
     user: node
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -e
         RAW=https://raw.githubusercontent.com/wyterlin1-svg/Roteiro-Assistente-/refs/heads/claude/roteirista-40s
-        mkdir -p public
+        mkdir -p /home/node/app/public && cd /home/node/app
         wget -qO servidor.js "$$RAW/servidor.js"
         wget -qO public/index.html "$$RAW/public/index.html"
         wget -qO public/login.html "$$RAW/public/login.html"
