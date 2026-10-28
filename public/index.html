@@ -2,302 +2,910 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Agente de roteiros de Reels de até 40 segundos guiado pelo algoritmo do Instagram.">
 <title>Roteirista 40s</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
+  /* Layout: mesa de roteiro — briefing à esquerda, folha de gravação com timecode à direita; empilha no celular. */
   :root {
-    --bg: #f6f4ef; --card: #ffffff; --ink: #17151a; --muted: #6b6672; --line: #e4e0d8;
-    --accent: #ff3d6e; --accent-ink: #ffffff; --ok: #12a150; --warn: #c27c00; --bad: #d83a3a;
-    --chip: #f0ece4;
+    --bg: #f2f2f6; --surface: #ffffff; --sunk: #e8e8f0; --fg: #16141f; --muted: #646178; --line: #dcdbe6;
+    --accent: #e0305f; --accent-soft: #fbe3ea; --on-accent: #ffffff;
+    --ok: #138a4c; --warn: #b26a00; --bad: #c72f2f;
+    --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+    --f-body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0f0e12; --card: #18161d; --ink: #f3f1f5; --muted: #9a94a3; --line: #2a2731;
-      --chip: #221f28; --ok: #3ccf7c; --warn: #f0b23a; --bad: #ff6b6b;
+      --bg: #121119; --surface: #1b1a25; --sunk: #24222f; --fg: #f1f0f6; --muted: #a29fb5; --line: #2f2d3c;
+      --accent: #ff5a85; --accent-soft: #3a1a26; --on-accent: #1a0b11;
+      --ok: #45d08a; --warn: #f2b247; --bad: #ff7272; color-scheme: dark;
     }
   }
+  :root[data-theme="dark"] {
+    --bg: #121119; --surface: #1b1a25; --sunk: #24222f; --fg: #f1f0f6; --muted: #a29fb5; --line: #2f2d3c;
+    --accent: #ff5a85; --accent-soft: #3a1a26; --on-accent: #1a0b11;
+    --ok: #45d08a; --warn: #f2b247; --bad: #ff7272; color-scheme: dark;
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 80px; }
-  h1 { font-size: 28px; margin: 0; letter-spacing: -0.02em; }
-  h1 span { color: var(--accent); }
-  .sub { color: var(--muted); margin: 4px 0 20px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
-  input, select, textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
-  textarea { resize: vertical; min-height: 60px; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  button { font: inherit; border: 0; border-radius: 12px; padding: 12px 16px; cursor: pointer; background: var(--chip); color: var(--ink); }
-  button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 700; width: 100%; padding: 15px; font-size: 17px; }
-  button:disabled { opacity: .5; cursor: wait; }
-  .acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .acoes button { flex: 1 1 auto; }
-  .dado { display: grid; gap: 6px; font-size: 14px; }
-  .dado b { color: var(--accent); }
-  .dado .cod { font-family: ui-monospace, monospace; font-size: 18px; letter-spacing: .15em; }
-  .placar { display: flex; align-items: center; gap: 16px; }
-  .nota { font-size: 44px; font-weight: 800; line-height: 1; }
-  .barra { height: 8px; background: var(--chip); border-radius: 99px; overflow: hidden; margin: 6px 0; }
-  .barra i { display: block; height: 100%; background: var(--accent); }
-  .sinais { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; font-size: 12px; color: var(--muted); }
-  .alerta { font-size: 14px; color: var(--warn); margin: 4px 0; }
-  .gancho { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 10px 0; }
-  .tag { display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--chip); padding: 2px 8px; border-radius: 99px; }
-  .linha { display: grid; grid-template-columns: 56px 1fr; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
-  .linha:first-of-type { border-top: 0; }
-  .tempo { font-family: ui-monospace, monospace; font-size: 13px; color: var(--accent); }
-  .fala { font-size: 17px; font-weight: 600; }
-  .meta { font-size: 13px; color: var(--muted); }
-  .timeline { display: flex; height: 10px; border-radius: 99px; overflow: hidden; gap: 2px; margin: 8px 0 4px; }
-  .timeline i { background: var(--accent); opacity: .35; }
-  .timeline i:nth-child(odd) { opacity: .7; }
-  .hist button { display: block; width: 100%; text-align: left; margin-top: 6px; font-size: 14px; }
-  .erro { color: var(--bad); }
-  .topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 18px; }
-  .topo a { color: var(--ink); text-decoration: none; margin-left: 12px; }
-  .cota { background: var(--chip); padding: 4px 10px; border-radius: 99px; }
-  .vazio { color: var(--muted); font-size: 14px; }
-  pre { white-space: pre-wrap; font: inherit; margin: 0; }
-  /* Teleprompter */
-  #tp { position: fixed; inset: 0; background: #000; color: #fff; display: none; flex-direction: column; z-index: 10; }
-  #tp.on { display: flex; }
-  #tp header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; font-family: ui-monospace, monospace; }
-  #tp .relogio { font-size: 22px; color: #ff3d6e; }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  header.topo { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  h1 { font: 800 clamp(30px, 5vw, 46px)/1 var(--f-display); letter-spacing: -0.03em; margin: 0; }
+  h1 .seg { font-family: var(--f-mono); font-weight: 700; color: var(--accent); font-size: .72em; letter-spacing: -0.02em; }
+  .lema { color: var(--muted); max-width: 46ch; margin: 6px 0 0; text-wrap: balance; }
+  .rec { font: 600 12px var(--f-mono); color: var(--accent); display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: .08em; }
+  .rec::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); animation: pisca 1.6s infinite; }
+  @keyframes pisca { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .rec::before { animation: none; } }
+
+  .mesa { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 22px; align-items: start; }
+  @media (max-width: 860px) { .mesa { grid-template-columns: minmax(0, 1fr); } }
+
+  .painel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 14px; }
+  .painel h2, .folha h2 { font: 700 13px var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0; }
+  label { display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
+  label small { font-weight: 400; color: var(--muted); }
+  .lacuna { background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 0 3px; }
+  .fala[contenteditable] { border-radius: 6px; cursor: text; }
+  .fala[contenteditable]:hover { background: var(--sunk); }
+  .fala[contenteditable]:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
+  input, textarea, select { width: 100%; padding: 11px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; }
+  textarea { resize: vertical; min-height: 64px; }
+  input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .duas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tempos { display: flex; gap: 6px; }
+  .tempos button { flex: 1; font-family: var(--f-mono); }
+  .tempos button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+  button { font: 600 14px var(--f-body); border: 1px solid var(--line); background: var(--sunk); color: var(--fg); border-radius: 9px; padding: 10px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: .55; cursor: progress; }
+  button.go { background: var(--accent); color: var(--on-accent); border-color: transparent; font-size: 16px; padding: 14px; font-family: var(--f-display); font-weight: 700; letter-spacing: -0.01em; }
+  .linha-btn { display: flex; gap: 8px; flex-wrap: wrap; }
+  .linha-btn > button { flex: 1 1 auto; }
+
+  .dado { border: 1px dashed var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 6px; font-size: 13px; }
+  .dado .cod { display: flex; justify-content: space-between; align-items: center; font: 700 15px var(--f-mono); letter-spacing: .12em; }
+  .dado dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+  .dado dt { font: 600 11px var(--f-mono); text-transform: uppercase; color: var(--accent); padding-top: 2px; }
+  .dado dd { margin: 0; }
+  .status { font-size: 13px; color: var(--muted); min-height: 1.4em; margin: 0; }
+  .status.erro { color: var(--bad); }
+
+  .folha { display: grid; gap: 16px; min-width: 0; }
+  .bloco { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; min-width: 0; }
+  .selo { display: inline-block; font: 600 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; padding: 3px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+
+  .placar { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; }
+  .anel { --p: 0; width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(var(--cor, var(--accent)) calc(var(--p) * 1%), var(--sunk) 0); }
+  .anel span { width: 74px; height: 74px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; font: 800 28px var(--f-display); font-variant-numeric: tabular-nums; }
+  .placar h3 { font: 700 20px var(--f-display); margin: 0; letter-spacing: -0.01em; }
+  .medidas { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px 12px; margin-top: 14px; }
+  .medida { font-size: 12px; color: var(--muted); }
+  .medida .bar { height: 5px; border-radius: 9px; background: var(--sunk); margin-top: 4px; overflow: hidden; }
+  .medida .bar i { display: block; height: 100%; background: var(--accent); }
+  .alertas { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; color: var(--warn); }
+  .alertas li::before { content: "▲ "; font-size: 10px; }
+
+  .titulo-roteiro { font: 800 clamp(24px, 3.4vw, 34px)/1.1 var(--f-display); letter-spacing: -0.02em; margin: 8px 0 6px; text-wrap: balance; }
+  .fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
+  .fato { background: var(--sunk); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .fato b { display: block; font: 600 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 2px; }
+
+  .ganchos { display: grid; gap: 10px; margin-top: 10px; }
+  .gancho { display: grid; grid-template-columns: 26px 1fr; gap: 10px; }
+  .gancho .n { font: 700 13px var(--f-mono); color: var(--accent); padding-top: 3px; }
+  .gancho q { font: 700 17px/1.35 var(--f-display); quotes: "“" "”"; }
+  .gancho p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+  .regua { display: flex; height: 26px; gap: 2px; margin: 12px 0 2px; }
+  .regua i { background: var(--accent-soft); border-radius: 4px; position: relative; min-width: 8px; }
+  .regua i:first-child { background: var(--accent); }
+  .regua i span { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); font: 700 10px var(--f-mono); color: var(--accent); }
+  .regua i:first-child span { color: var(--on-accent); }
+  .escala { display: flex; justify-content: space-between; font: 500 11px var(--f-mono); color: var(--muted); }
+  .cena { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .cena:first-of-type { border-top: 0; }
+  .tc { font: 700 13px var(--f-mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+  .tc small { display: block; color: var(--muted); font-weight: 500; margin-top: 2px; }
+  .fala { font: 600 17px/1.4 var(--f-body); margin: 0 0 6px; }
+  .direcao { display: grid; gap: 2px; font-size: 13px; color: var(--muted); }
+  .direcao b { color: var(--fg); font-weight: 600; }
+  .sinal { margin-top: 6px; font: 600 11px var(--f-mono); color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+
+  .sinais { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-top: 10px; }
+  .sinais div { border-left: 2px solid var(--accent); padding: 2px 0 2px 10px; font-size: 14px; }
+  .sinais b { display: block; font: 600 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  pre.legenda { white-space: pre-wrap; font: inherit; margin: 10px 0; background: var(--sunk); padding: 12px; border-radius: 10px; }
+
+  .ideias { display: grid; gap: 10px; }
+  .ideia { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 6px; background: var(--surface); }
+  .ideia h3 { margin: 0; font: 700 17px var(--f-display); }
+  .ideia q { font-weight: 600; }
+  .ideia p { margin: 0; font-size: 13px; color: var(--muted); }
+  .ideia button { justify-self: start; }
+
+  .hist { display: grid; gap: 6px; }
+  .hist button { text-align: left; display: flex; justify-content: space-between; gap: 10px; font-weight: 500; }
+  .hist button span:last-child { font-family: var(--f-mono); color: var(--accent); }
+  .vazio { color: var(--muted); font-size: 13px; margin: 0; }
+
+  /* Teleprompter: um único visual escuro de propósito, como num estúdio. */
+  #tp { position: fixed; inset: 0; z-index: 20; background: #050508; color: #f5f4fa; display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(16px, env(safe-area-inset-left, 0px)); }
+  #tp header { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; font-family: var(--f-mono); gap: 10px; }
+  #tp .rel { font-size: 24px; color: #ff5a85; font-variant-numeric: tabular-nums; }
   #tp .palco { flex: 1; overflow: hidden; position: relative; }
-  #tp .texto { position: absolute; left: 0; right: 0; padding: 40vh 20px; font-size: clamp(26px, 7vw, 44px); line-height: 1.35; font-weight: 700; text-align: center; }
-  #tp .texto p { margin: 0 0 1.2em; opacity: .35; transition: opacity .2s; }
+  #tp .texto { position: absolute; inset: 0 0 auto; padding: 38vh 0; text-align: center; transition: transform .35s ease; }
+  #tp .texto p { margin: 0 auto 1.1em; max-width: 22ch; font: 700 clamp(26px, 6.5vw, 46px)/1.3 var(--f-display); opacity: .28; transition: opacity .2s; }
   #tp .texto p.agora { opacity: 1; }
-  #tp .texto small { display: block; font-size: .45em; color: #ff3d6e; font-weight: 600; }
-  #tp .conta { position: absolute; inset: 0; display: grid; place-items: center; font-size: 30vw; font-weight: 800; background: #000; }
-  #tp .conta[hidden] { display: none; }
-  #tp footer { display: flex; gap: 8px; padding: 12px 16px; }
-  #tp footer button { flex: 1; background: #222; color: #fff; }
+  #tp .texto small { display: block; font: 600 13px var(--f-mono); color: #ff5a85; margin-bottom: 6px; }
+  #tp .conta { position: absolute; inset: 0; display: grid; place-items: center; font: 800 32vw var(--f-display); background: #050508; }
+  #tp footer { display: flex; gap: 10px; padding: 14px 0; }
+  #tp footer button { flex: 1; background: #1c1b26; color: #f5f4fa; border-color: #2f2d3c; }
+  @media (prefers-reduced-motion: reduce) { #tp .texto { transition: none; } }
 </style>
 </head>
 <body>
-<main>
-  <nav class="topo">
-    <span>👤 <b id="quem"></b> <span class="cota" id="cota"></span></span>
-    <span><a href="/admin" id="linkAdmin" hidden>Clientes</a><a href="#" id="trocarSenha">Trocar senha</a><a href="#" id="sair">Sair</a></span>
-  </nav>
-  <h1>Roteirista <span>40s</span></h1>
-  <p class="sub">Roteiros de Reels guiados pelos sinais do algoritmo: retenção, replay, envios e salvamentos.</p>
+<div class="wrap">
+  <header class="topo">
+    <div>
+      <h1>Roteirista <span class="seg">00:40</span></h1>
+      <p class="lema">Agente de roteiros para Reels: gancho nos 3 primeiros segundos, emoção, loop e um motivo para mandarem seu vídeo para alguém. Grátis e sem cadastro.</p>
+    </div>
+    <span class="rec" id="modo">pronto para criar</span>
+  </header>
 
-  <form class="card" id="form">
-    <label for="nicho">Seu nicho *</label>
-    <input id="nicho" required placeholder="ex.: finanças pessoais, confeitaria, academia, advocacia">
-    <label for="tema">Tema ou ideia (deixe vazio se estiver sem ideia)</label>
-    <textarea id="tema" placeholder="ex.: por que ninguém consegue guardar dinheiro"></textarea>
-    <div class="row">
-      <div>
-        <label for="publico">Público</label>
-        <input id="publico" placeholder="ex.: mães de 30+">
+  <div class="mesa">
+    <form class="painel" id="briefing" novalidate>
+      <h2>Briefing</h2>
+      <label>Nicho <input id="nicho" placeholder="finanças pessoais, confeitaria, academia…" autocomplete="off"></label>
+      <label>Tema <small>deixe vazio se estiver sem ideia</small>
+        <textarea id="tema" placeholder="por que ninguém consegue guardar dinheiro"></textarea></label>
+      <div class="duas">
+        <label>Público <input id="publico" placeholder="mães de 30+"></label>
+        <label>Tom <input id="tom" placeholder="direto, engraçado"></label>
       </div>
       <div>
-        <label for="duracao">Duração máxima</label>
-        <select id="duracao">
-          <option value="15">15s</option><option value="20">20s</option><option value="30" selected>30s</option><option value="40">40s</option>
-        </select>
+        <label style="margin-bottom:5px">Duração máxima</label>
+        <div class="tempos" id="tempos">
+          <button type="button" data-s="15" aria-pressed="false">15s</button>
+          <button type="button" data-s="20" aria-pressed="false">20s</button>
+          <button type="button" data-s="30" aria-pressed="true">30s</button>
+          <button type="button" data-s="40" aria-pressed="false">40s</button>
+        </div>
       </div>
-    </div>
-    <label for="tom">Tom</label>
-    <input id="tom" placeholder="ex.: direto e engraçado, sério, provocador">
 
-    <label>Dado da colisão criativa</label>
-    <div class="card dado" id="dado" style="margin:0"></div>
-    <div class="acoes">
-      <button type="button" id="rolar">🎲 Rolar outro dado</button>
-      <button type="button" id="semIdeia">💡 Estou sem ideia</button>
-    </div>
-    <div class="acoes"><button class="primary" id="gerar">Criar roteiro</button></div>
-    <p class="erro" id="erro"></p>
-    <p class="vazio">Primeira vez? <a href="#" id="exemplo">Veja um roteiro de exemplo</a> (não gasta sua cota).</p>
-  </form>
+      <div class="dado" aria-live="polite">
+        <div class="cod"><span>Dado criativo <span id="semente"></span></span><button type="button" id="rolar" title="Sortear outra combinação">🎲 Rolar</button></div>
+        <dl id="colisao"></dl>
+      </div>
 
-  <section id="saida"></section>
+      <label id="motorBox" hidden>Quem escreve
+        <select id="motor">
+          <option value="ia">IA do Claude (mais criativa, usa sua conta)</option>
+          <option value="proprio">Motor próprio (instantâneo, sem IA)</option>
+        </select></label>
 
-  <section class="card hist">
-    <b>Histórico</b>
-    <div id="historico" class="vazio">Seus roteiros ficam salvos aqui neste navegador.</div>
-  </section>
-</main>
+      <button class="go" id="criar">Criar roteiro</button>
+      <div class="linha-btn">
+        <button type="button" id="semIdeia">Estou sem ideia: me dê 5</button>
+      </div>
+      <p class="status" id="status" role="status"></p>
+    </form>
 
-<div id="tp">
-  <header><span id="tpTitulo"></span><span class="relogio" id="tpRelogio">0.0s</span></header>
+    <main class="folha" id="folha"></main>
+  </div>
+</div>
+
+<div id="tp" hidden>
+  <header><span id="tpTitulo"></span><span class="rel" id="tpRel">00.0</span></header>
   <div class="palco"><div class="texto" id="tpTexto"></div><div class="conta" id="tpConta" hidden></div></div>
-  <footer><button id="tpIniciar">▶ Gravar</button><button id="tpFechar">Fechar</button></footer>
+  <footer><button id="tpGravar">▶ Começar</button><button id="tpFechar">Fechar</button></footer>
 </div>
 
 <script>
+// ===== Colisão criativa: peças que não combinam, sorteadas por uma semente =====
+const EMOCOES = ["raiva justa (injustiça que todo mundo já sentiu)", "alívio (\"então não sou só eu\")", "nostalgia afiada", "orgulho de grupo", "medo de estar perdendo algo", "vergonha alheia divertida", "surpresa genuína", "esperança concreta", "indignação com um mito", "ternura inesperada"];
+const ANGULOS = ["confissão de um erro que o público também comete", "contraintuitivo: defender o oposto do conselho popular", "erro caro: quanto custou fazer do jeito \"certo\"", "teste ao vivo na frente da câmera", "o bastidor que o mercado esconde", "ranking polêmico", "mito destruído em 3 provas", "carta para o eu do passado", "detetive de um detalhe que todos ignoram", "cronômetro: resolver antes do vídeo acabar", "explicar algo complexo como se fosse fofoca", "tribunal: acusar um hábito comum"];
+const FORMATOS = ["fala direta, olho na câmera, cortes secos", "POV em primeira pessoa", "voz em off + imagens do dia a dia", "encenação com 2 personagens (a mesma pessoa)", "green screen sobre um print", "lista relâmpago com contador na tela", "plano-sequência sem cortes", "tela dividida: expectativa x realidade"];
+const RESTRICOES = ["começar pelo final da história", "usar um objeto do dia a dia como metáfora central", "nunca dizer o nome do tema explicitamente", "contar tudo com exatamente 3 números", "a primeira frase é uma ordem curta", "o roteiro inteiro em diálogo", "terminar com a mesma frase que abriu", "uma pausa de silêncio proposital", "revelar a resposta só no último segundo", "falar com uma pessoa específica (\"você que…\")"];
+const ALFA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function hash(t) { let h = 2166136261; for (const c of t) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
+function prng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function novaSemente() { let s = ""; for (let i = 0; i < 5; i++) s += ALFA[Math.floor(Math.random() * ALFA.length)]; return s; }
+function colidir(sem) { const r = prng(hash(sem)); const p = (l) => l[Math.floor(r() * l.length)];
+  return { semente: sem, emocao: p(EMOCOES), angulo: p(ANGULOS), formato: p(FORMATOS), restricao: p(RESTRICOES) }; }
+
+// ===== Viralômetro: auditoria local, sem gastar nada =====
+const PPS = 2.6; // palavras por segundo na fala natural em português
+const CLICHES = ["você sabia que", "neste vídeo", "nesse vídeo", "fala galera", "fala, galera", "olá pessoal", "oi gente", "segue para mais", "siga para mais", "deixa seu like", "descubra", "mergulhar", "mergulhe", "desvendar", "jornada", "incrível", "no mundo de hoje", "nos dias de hoje", "vamos falar sobre", "hoje eu vou te mostrar", "fique até o final", "assista até o final", "transforme sua vida", "segredo revelado"];
+const TENSAO = /\d|\?|!|nunca|ningu[eé]m|\bpar[ea]\b|\berr[oa]|errad|mentir|proibid|verdade|cuidado|evite|\bmas\b|(^|\s)só(?=[\s,.!?]|$)/i;
+const palavras = (t = "") => (String(t).trim().match(/\S+/g) || []).length;
+const MAX = { gancho: 25, duracao: 25, ritmo: 15, loop: 10, envio: 15, original: 10 };
+function avaliar(r, alvo) {
+  const al = [], n = {}, cenas = r.cenas || [];
+  const fala = cenas.map((c) => c.fala).join(" ");
+  const g0 = cenas[0]?.fala || "", pg = palavras(g0);
+  n.gancho = 0;
+  if (pg > 0 && pg <= 12) n.gancho += 12; else al.push(`Gancho com ${pg} palavras: corte para no máximo 12.`);
+  if (TENSAO.test(g0)) n.gancho += 7; else al.push("Gancho sem tensão (número, contraste, pergunta ou proibição).");
+  if (cenas[0]?.texto_tela) n.gancho += 6; else al.push("Gancho sem texto na tela: muita gente assiste sem som.");
+  const seg = palavras(fala) / PPS;
+  n.duracao = seg <= alvo ? 25 : Math.max(0, 25 - Math.ceil((seg - alvo) * 3));
+  if (seg > alvo) al.push(`Fala estimada em ${seg.toFixed(1)}s: passa do limite de ${alvo}s.`);
+  const dur = cenas.map((c) => Math.max(0, (c.fim ?? 0) - (c.inicio ?? 0)));
+  n.ritmo = 15;
+  if (dur.length && Math.max(...dur) > 6) { n.ritmo = 8; al.push("Cena longa sem quebra visual: corte ou mude o plano a cada 3 a 5s."); }
+  if (cenas.length < 4) n.ritmo -= 5;
+  const apertadas = cenas.filter((c, i) => palavras(c.fala) / PPS > dur[i] + 1).length;
+  if (apertadas) { n.ritmo -= 3; al.push(`${apertadas} cena(s) com mais fala do que tempo.`); }
+  n.ritmo = Math.max(0, n.ritmo);
+  n.loop = String(r.loop || "").trim().length > 10 ? 10 : 0;
+  if (!n.loop) al.push("Sem loop: o final não puxa o replay.");
+  n.envio = { envio: 15, salvar: 12, comentar: 10 }[r.cta?.tipo] ?? 0;
+  if (r.cta?.tipo !== "envio") al.push("O CTA de envio (\"manda pra…\") é o que mais alcança quem não segue você.");
+  const tudo = [fala, r.legenda, ...(r.ganchos || []).map((g) => g.fala)].join(" ").toLowerCase();
+  const cl = CLICHES.filter((c) => tudo.includes(c));
+  n.original = Math.max(0, 10 - cl.length * 5);
+  if (cl.length) al.push(`Clichês de IA: ${cl.join(", ")}.`);
+  const total = Object.values(n).reduce((a, b) => a + b, 0);
+  return { total, n, alertas: al, segundos: +seg.toFixed(1), palavras: palavras(fala),
+    nivel: total >= 85 ? "Pronto para gravar" : total >= 65 ? "Bom, ajuste os alertas" : "Reescreva antes de gravar" };
+}
+
+// ===== O cérebro do agente: o que o Claude recebe =====
+const REGRAS = `Você é o ROTEIRISTA 40S, diretor de Reels do Instagram obcecado por retenção. Você não escreve "conteúdo": escreve segundos que a pessoa não consegue parar de assistir e PRECISA mandar para alguém.
+
+COMO O INSTAGRAM DECIDE (sua bússola). Para cada pessoa, ele prevê a chance de:
+1. passar dos 3 primeiros segundos; 2. assistir até o fim; 3. assistir de novo (replay/loop);
+4. ENVIAR por DM (o sinal que mais leva um Reel a quem não segue a conta); 5. salvar; 6. comentar e curtir (mais fracos).
+Também pesa: originalidade (conteúdo genérico ou reciclado é rebaixado), legenda e texto que ajudam a busca do Instagram.
+Cada linha precisa servir a pelo menos um desses sinais. Se não serve, corte.
+
+LEIS DO ROTEIRO
+- Fala natural ≈ 2,6 palavras por segundo. Respeite a duração. Conte as palavras.
+- GANCHO TRIPLO em 0–3s: fala de até 12 palavras + texto na tela de até 6 palavras (diferente da fala) + ação visual estranha. O gancho abre uma pergunta que só o final fecha.
+- Sem introdução, sem saudação, sem "contexto". Começa no meio da ação.
+- Quebra de padrão a cada 3–5s (corte, plano, texto, som, objeto). Nenhuma cena passa de 5s.
+- Payoff concreto: número, prova, virada ou frase que vira print.
+- LOOP: a última frase emenda na primeira, para o replay parecer continuação.
+- GATILHO DE ENVIO: defina para QUEM a pessoa mandaria. O roteiro faz o espectador pensar em alguém específico.
+- CTA: envio > salvar > comentar. Nunca "curte e segue". O CTA faz parte da história.
+- Uma emoção dominante, sentida no corpo, antes da informação.
+- Português brasileiro falado, frases curtas.
+
+ANTIFÓRMULA (proibido): "Você sabia que", "Neste vídeo", "Fala galera", "Olá pessoal", "Hoje eu vou te mostrar", "Fique até o final", "Descubra", "mergulhar", "desvendar", "jornada", "incrível", "no mundo de hoje", "transforme sua vida", "segredo revelado", "segue para mais", dicas óbvias, conselho de primeiro resultado do Google, final motivacional vazio. Se a frase caberia no vídeo de qualquer criador, reescreva até ela só caber neste.
+
+FALAS FORA DA CAIXA (o coração do roteiro)
+Escreva TODAS as falas completas, palavra por palavra, prontas para ler no teleprompter. Nada de [lacunas], colchetes ou "insira aqui".
+Use pelo menos duas destas técnicas em cada roteiro:
+- Metáfora de objeto improvável: explique o assunto com um objeto do dia a dia que não tem nada a ver com o nicho (botão soneca, fila do mercado, gaveta da bagunça…).
+- Personificação: o problema fala em primeira pessoa ("Oi, eu sou o boleto que você esqueceu").
+- Anti-tutorial: ensine como fracassar, para o público fazer o contrário.
+- Pergunta-armadilha: uma pergunta que quase todo mundo responde errado.
+- Número estranho e específico, que soa verdadeiro (nada de estatística inventada apresentada como fato).
+- Frase de print: uma linha curta que caberia numa camiseta.
+- Quebra da quarta parede: falar com o dedo de quem está prestes a pular o vídeo.
+- Diálogo interno: a voz da cabeça do público discutindo com ele.
+Teste de originalidade: se a fala poderia estar no vídeo de outro criador do mesmo nicho, troque por uma que só este roteiro teria.
+
+COLISÃO CRIATIVA: você recebe emoção + ângulo + formato + restrição sorteados. Eles parecem não combinar, e é isso que gera a ideia que ninguém teve. Obedeça a restrição ao pé da letra. Sem tema? Crie a partir do nicho e da colisão, com uma situação muito específica e reconhecível do público (cena do cotidiano, nada abstrato).`;
+
+const FORMATO = `Responda SOMENTE com um objeto JSON neste formato exato:
+{"titulo":"nome curto","ideia_central":"1 frase","emocao":"emoção dominante","gatilho_de_envio":"Manda pra …",
+"ganchos":[{"tipo":"…","fala":"…","texto_tela":"…","visual":"…"}],
+"cenas":[{"inicio":0,"fim":3,"fala":"…","texto_tela":"…","visual":"…","sinal":"qual sinal do algoritmo a cena ataca"}],
+"loop":"como o final emenda no começo","cta":{"tipo":"envio","fala":"…"},
+"legenda":"legenda curta com palavras que o público buscaria, até 3 hashtags específicas","capa":"até 5 palavras","audio":"sugestão de som",
+"sinais":{"retencao_3s":"…","conclusao":"…","replay":"…","envios":"…","salvamentos":"…","comentarios":"…"}}
+Regras do JSON: todas as falas completas, sem colchetes nem lacunas; exatamente 3 ganchos de tipos diferentes; a 1ª cena usa o gancho mais forte; "inicio"/"fim" em segundos inteiros, contínuos, começando em 0; "cta.tipo" é "envio", "salvar" ou "comentar".`;
+
+function promptRoteiro(b, ajuste) {
+  return [REGRAS, "", "PEDIDO",
+    `Nicho: ${b.nicho}`,
+    `Tema: ${b.tema || "(sem ideia: crie a partir do nicho e da colisão)"}`,
+    b.publico && `Público: ${b.publico}`, b.tom && `Tom: ${b.tom}`,
+    `Duração máxima: ${b.duracao}s (no máximo ${Math.floor(b.duracao * PPS)} palavras faladas no total)`,
+    "", `COLISÃO #${b.col.semente}`, `- Emoção: ${b.col.emocao}`, `- Ângulo: ${b.col.angulo}`, `- Formato: ${b.col.formato}`, `- Restrição: ${b.col.restricao}`,
+    ajuste && `\nREESCREVA corrigindo estes problemas da versão anterior:\n${ajuste}`,
+    "", FORMATO].filter(Boolean).join("\n");
+}
+
+function promptIdeias(b) {
+  return `${REGRAS}
+
+Tarefa: o criador está SEM IDEIA. Crie 5 ideias de Reels de até ${b.duracao}s para o nicho "${b.nicho}"${b.publico ? `, público: ${b.publico}` : ""}.
+Cada ideia usa um ângulo diferente e nasce de uma situação concreta e reconhecível do público. Pelo menos uma deve usar esta colisão: ${b.col.emocao} + ${b.col.angulo}.
+Responda SOMENTE com um array JSON de 5 objetos:
+[{"titulo":"nome curto","gancho":"primeira frase falada, até 12 palavras","emocao":"…","por_que":"por que alguém mandaria isso para um amigo, 1 frase"}]`;
+}
+
+// ===== Exemplo que aparece ao abrir (marcado como exemplo) =====
+const EXEMPLO = {
+  titulo: "O café é inocente",
+  ideia_central: "Inverter o conselho de cortar o cafezinho e mostrar, ao vivo, o gasto invisível que realmente pesa: assinaturas esquecidas.",
+  emocao: "alívio com uma pitada de raiva justa do conselho repetido",
+  gatilho_de_envio: "Manda pra aquele amigo que vive dizendo que vai parar de tomar café pra economizar.",
+  ganchos: [
+    { tipo: "ordem curta", fala: "Para de cortar o cafezinho. Ele nunca foi o problema.", texto_tela: "O vilão não é o café", visual: "Bate o copo de café na mesa, encarando a câmera." },
+    { tipo: "número", fala: "Achei 197 reais por mês em dois minutos.", texto_tela: "R$ 197 escondidos", visual: "Celular colado na lente com o extrato desfocado." },
+    { tipo: "acusação", fala: "Quem te mandou cortar o café mentiu pra você.", texto_tela: "Te enganaram", visual: "Aponta para a câmera segurando o copo." }
+  ],
+  cenas: [
+    { inicio: 0, fim: 4, fala: "Para de cortar o cafezinho. Ele nunca foi o problema.", texto_tela: "O vilão não é o café", visual: "Bate o copo na mesa, encarando a câmera.", sinal: "retenção 3s" },
+    { inicio: 4, fim: 10, fala: "Seis reais por dia dá cento e oitenta no mês. Abre o app do banco comigo.", texto_tela: "R$ 180/mês", visual: "Corte seco para a tela do celular; o número aparece grande.", sinal: "conclusão" },
+    { inicio: 10, fim: 15, fala: "Procura débito automático. Tá vendo aquele app que você assinou e esqueceu?", texto_tela: "assinaturas esquecidas", visual: "Zoom rápido no extrato rolando.", sinal: "conclusão" },
+    { inicio: 15, fim: 21, fala: "Aqui tinha três: streaming, app de treino e um curso que eu nunca abri.", texto_tela: "3 assinaturas", visual: "Três cortes rápidos, um ícone de cada app.", sinal: "comentários" },
+    { inicio: 21, fim: 25, fala: "Cento e noventa e sete reais. Mais que o café do mês inteiro.", texto_tela: "R$ 197 > R$ 180", visual: "Tela dividida: copo de café x as três assinaturas.", sinal: "salvamentos" },
+    { inicio: 25, fim: 31, fala: "Cancelei tudo em dois minutos. O café eu continuo tomando, sem culpa.", texto_tela: "Cancelado ✅", visual: "Toma um gole devagar, sorrindo.", sinal: "emoção" },
+    { inicio: 31, fim: 37, fala: "Manda pra quem vive dizendo que vai parar de tomar café. E para de cortar o cafezinho.", texto_tela: "manda pra essa pessoa", visual: "Aponta para a câmera e bate o copo na mesa de novo.", sinal: "envios + replay" }
+  ],
+  loop: "A última frase repete a primeira e o copo bate na mesa com o mesmo som do início.",
+  cta: { tipo: "envio", fala: "Manda pra quem vive dizendo que vai parar de tomar café." },
+  legenda: "Cortar o cafezinho é o conselho de finanças mais repetido e o que menos funciona. Confere seus débitos automáticos hoje e me conta quanto achou. #financaspessoais #economizardinheiro #assinaturas",
+  capa: "O café é inocente",
+  audio: "Sem música nos 3 primeiros segundos (o som do copo é o gancho); depois uma batida lo-fi baixa.",
+  sinais: {
+    retencao_3s: "Contraria um conselho famoso com som e gesto fortes no primeiro segundo.",
+    conclusao: "Convida a abrir o app junto, uma tarefa que só termina no fim.",
+    replay: "A última frase e o som do copo repetem a abertura.",
+    envios: "Todo mundo conhece alguém que jura que vai parar de tomar café para economizar.",
+    salvamentos: "Passo prático (procurar débito automático) que a pessoa quer fazer depois.",
+    comentarios: "A confissão do curso nunca aberto puxa \"eu também\" e os valores encontrados."
+  }
+};
+
+// ===== Motor próprio: escreve o roteiro inteiro na própria página, sem IA e sem conta =====
+// A virada criativa: cada roteiro explica o assunto por um OBJETO DO DIA A DIA que não tem
+// nada a ver com o nicho. Ângulo x objeto x variações de fala = milhares de roteiros diferentes.
+// Objeto: o = nome, e/E = pronome, p = o que ele promete, f = o que ele faz de verdade,
+// x = a correção no mundo do objeto, c = apelido curto ("no modo c").
+const OBJETOS = [
+  { o: "o botão soneca", e: "ele", p: "te dá mais cinco minutos", f: "rouba o começo do seu dia", x: "levantar no primeiro toque", c: "soneca" },
+  { o: "o GPS dizendo \"recalculando\"", e: "ele", p: "quer dizer que você se perdeu", f: "é o único momento em que alguém está prestando atenção no caminho", x: "aceitar o recalculando sem drama", c: "recalculando" },
+  { o: "a geladeira aberta de madrugada", e: "ela", p: "vai mostrar alguma coisa nova", f: "mostra exatamente o que estava lá às oito da noite", x: "decidir antes de abrir a porta", c: "geladeira aberta" },
+  { o: "o carregador que só funciona torto", e: "ele", p: "só precisa de um jeitinho", f: "é um problema que você se acostumou a segurar", x: "trocar o cabo de uma vez", c: "carregador torto" },
+  { o: "a planta de plástico", e: "ela", p: "está bonita e não dá trabalho", f: "nunca cresce, porque nunca precisou de nada", x: "cuidar de uma coisa viva, mesmo que dê trabalho", c: "planta de plástico" },
+  { o: "a fila do lado no mercado", e: "ela", p: "anda mais rápido", f: "te faz trocar de fila e chegar por último", x: "escolher uma fila e ficar nela", c: "troca-fila" },
+  { o: "o botão de fechar a porta do elevador", e: "ele", p: "acelera tudo", f: "em muito elevador nem funciona, só te dá sensação de controle", x: "parar de apertar botão que não faz nada", c: "aperta-botão" },
+  { o: "o guarda-chuva comprado na chuva", e: "ele", p: "resolve o problema na hora", f: "custa o dobro e quebra no primeiro vento", x: "decidir antes da chuva começar", c: "guarda-chuva de última hora" },
+  { o: "a senha 123456", e: "ela", p: "é prática", f: "é a primeira que qualquer um tenta", x: "fazer do jeito que ninguém adivinha", c: "123456" },
+  { o: "a foto do primeiro dia de academia", e: "ela", p: "marca um começo", f: "acaba sendo o único dia pra muita gente", x: "aparecer no dia dois, sem foto", c: "primeiro dia" },
+  { o: "o micro-ondas aberto antes do apito", e: "ele", p: "economiza alguns segundos", f: "entrega a comida gelada no meio", x: "esperar o apito", c: "abre antes do apito" },
+  { o: "a gaveta da bagunça", e: "ela", p: "guarda o que é importante", f: "é onde as coisas vão pra ser esquecidas", x: "esvaziar a gaveta e ficar só com o que usa", c: "gaveta da bagunça" },
+  { o: "o grupo da família no WhatsApp", e: "ele", p: "te mantém informado", f: "repete a mesma notícia até você parar de ler", x: "silenciar o barulho e ler o que importa", c: "grupo da família" },
+  { o: "o tênis guardado pra ocasião especial", e: "ele", p: "está esperando o dia certo", f: "fica pequeno antes do dia chegar", x: "usar o tênis numa terça-feira qualquer", c: "tênis guardado" },
+];
+
+// O que fazer de verdade, em qualquer nicho (fecha a metáfora com algo prático).
+const ACOES = [
+  "fazer a primeira versão hoje, mal feita mesmo",
+  "escolher uma coisa só e cortar o resto",
+  "medir antes de mudar qualquer coisa",
+  "perguntar pra quem já chegou onde você quer chegar",
+  "fazer o simples por trinta dias antes de complicar",
+  "parar de esperar o momento certo e marcar uma data",
+  "mostrar o processo antes de ter o resultado",
+];
+
+// Estrutura por ângulo do dado (mesma ordem de ANGULOS). Cada fala tem variações.
+// Cena: [variações da fala, texto na tela, sinal do algoritmo, opcional?]
+// {N} nicho · {A} assunto · {d} duração · {o}/{O} objeto · {e}/{E} pronome · {p} {f} {x} {c} · {acao}
+const ESTRUTURAS = [
+  { tipo: "confissão", capa: "Eu errei. Feio.", por: "Confissão gera identificação: a pessoa se vê no erro e lembra de alguém que faz igual.",
+    g: ["Eu errei nisso por anos. E aposto que você também erra.", "Vou confessar um erro que repeti por tempo demais."], c: [
+    [["Eu tratava {N} igual {ao}.", "Por anos, eu fiz {N} no modo {c}."], "{o}", "retenção"],
+    [["Achava que {e} {p}.", "Na minha cabeça, {e} {p}."], "achava que…", "conclusão"],
+    [["Só que {e} {f}.", "Demorei pra ver que {e} {f}."], "só que…", "comentários"],
+    [["{A}: mesma lógica."], "{A}", "conclusão", 1],
+    [["Em {N}, {x} é {acao}.", "Hoje eu troquei isso por {acao}."], "o que mudou", "salvamentos"],
+    [["Manda pra quem ainda faz {N} no modo {c}. Eu errei nisso por anos."], "manda pra essa pessoa", "envios + replay"]] },
+  { tipo: "contraintuitivo", capa: "Esse conselho está errado", por: "Contrariar um conselho famoso gera discussão, e quem discorda manda para provar o ponto.",
+    g: ["Para de seguir esse conselho. Ele está te atrasando.", "O conselho mais repetido de {N} está errado. E te atrasa."], c: [
+    [["Ele soa sensato. Por isso ninguém questiona.", "Todo mundo repete. Ninguém mede o que ele custa."], "ninguém questiona", "conclusão"],
+    [["Seguir esse conselho é igual {ao}.", "Esse conselho é {o}, só que disfarçado."], "{o}", "retenção"],
+    [["Parece que {e} {p}. Mas {e} {f}.", "A promessa: {e} {p}. A verdade: {e} {f}."], "parece… mas", "comentários"],
+    [["Quem cresce em {N} quebra essa regra sem anunciar."], "quebra a regra", "comentários", 1],
+    [["Faz o oposto: {acao}.", "Tenta o contrário por uma semana: {acao}."], "faz o oposto", "salvamentos"],
+    [["Manda pra quem ainda repete esse conselho. E para de seguir ele."], "manda pra quem precisa", "envios + replay"]] },
+  { tipo: "erro caro", capa: "Esse erro custa caro", por: "Perda concreta dá medo de repetir o erro, e a pessoa avisa quem está prestes a cometê-lo.",
+    g: ["Esse erro custa caro, e ninguém percebe na hora.", "O erro mais caro de {N} não aparece na fatura."], c: [
+    [["Ele funciona igual {ao}.", "Ele tem a cara {do}."], "{o}", "retenção"],
+    [["Na hora, parece que {e} {p}.", "Você jura que {e} {p}."], "na hora parece…", "conclusão"],
+    [["A conta vem depois: {e} {f}.", "E a fatura chega disfarçada: {e} {f}."], "a conta vem depois", "comentários"],
+    [["Ninguém cobra no primeiro dia. Cobra no terceiro mês.", "Você paga em tempo, em energia e em vontade de desistir."], "a cobrança", "conclusão", 1],
+    [["Pra parar de pagar: {acao}.", "O jeito barato de sair dessa: {acao}."], "pra parar de pagar", "salvamentos"],
+    [["Manda pra quem tá prestes a pagar esse preço. Esse erro custa caro."], "manda antes que pague", "envios + replay"]] },
+  { tipo: "teste ao vivo", capa: "Você vai errar", por: "Um teste que quase todo mundo erra faz a pessoa testar os amigos.",
+    g: ["Teste rápido: você vai errar a resposta. Quase todo mundo erra.", "Vou provar agora que quase todo mundo erra nisso."], c: [
+    [["Pensa {no}.", "Imagina {o}. Agora."], "{o}", "retenção"],
+    [["Responde rápido: {e} {p}?", "Pergunta: {e} {p}?"], "sim ou não?", "comentários"],
+    [["Se disse sim, errou. {E} {f}.", "Quase todo mundo diz sim. Mas {e} {f}."], "errou", "replay"],
+    [["{A}: mesma pegadinha."], "{A}", "conclusão", 1],
+    [["Em {N}, {x} é {acao}.", "Em {N}, sair dessa pegadinha é {acao}."], "como sair", "salvamentos"],
+    [["Manda esse teste pra alguém e vê se a pessoa erra. Quase todo mundo erra."], "manda o teste", "envios + replay"]] },
+  { tipo: "bastidor", capa: "O que ninguém conta", por: "Bastidor dá sensação de informação exclusiva, que a pessoa quer compartilhar primeiro.",
+    g: ["Ninguém de {N} vai te contar isso.", "Tem uma coisa que {N} esconde de quem tá começando. Cuidado."], c: [
+    [["De fora, {N} parece {o}.", "Quem tá de fora enxerga {o}."], "de fora", "retenção"],
+    [["Todo mundo acha que {e} {p}.", "A vitrine promete que {e} {p}."], "a vitrine", "conclusão"],
+    [["Por trás, {e} {f}.", "Nos bastidores, {e} {f}."], "por trás", "comentários"],
+    [["E quem é de dentro sabe disso faz tempo."], "quem é de dentro sabe", "comentários", 1],
+    [["O que funciona de verdade: {acao}.", "O que os de dentro fazem: {acao}."], "o que funciona", "salvamentos"],
+    [["Manda pra quem ainda acredita na vitrine. Ninguém de {N} vai te contar isso."], "manda pra essa pessoa", "envios + replay"]] },
+  { tipo: "ranking", capa: "Ranking sem filtro", por: "Ranking provoca discordância: cada um quer defender a própria ordem nos comentários e no direct.",
+    g: ["Ranking sem filtro. Só o primeiro lugar já vai doer.", "Três jeitos de fazer {N}. O primeiro quase ninguém faz."], c: [
+    [["Terceiro lugar: o modo {c}. Parece que {e} {p}."], "3º lugar", "conclusão"],
+    [["Mas {e} {f}.", "Só que {e} {f}."], "3º lugar", "comentários"],
+    [["Segundo: tentar tudo ao mesmo tempo. Cansa antes de dar resultado.", "Segundo: copiar quem já chegou lá. Te deixa sempre um passo atrás."], "2º lugar", "comentários"],
+    [["Primeiro lugar: {acao}.", "E o primeiro: {acao}. Simples assim."], "1º lugar", "salvamentos"],
+    [["Discorda da ordem? Manda pra quem montaria esse ranking ao contrário."], "manda pra quem discorda", "envios + replay"]] },
+  { tipo: "mito", capa: "MITO. 3 provas.", por: "Derrubar um mito com provas dá munição para corrigir alguém, e a pessoa manda o vídeo como prova.",
+    g: ["O que você acredita sobre isso é mentira. Três provas.", "Esse mito de {N} é mentira. Três provas."], c: [
+    [["Prova um: esse mito é {o}.", "Prova um: ele é {o}, só que disfarçado."], "prova 1", "retenção"],
+    [["Prova dois: promete que {e} {p}.", "Prova dois: a promessa é que {e} {p}."], "prova 2", "conclusão"],
+    [["Prova três: na prática, {e} {f}.", "Prova três, a mais forte: {e} {f}."], "prova 3", "comentários"],
+    [["{A}: a verdade é outra."], "{A}", "conclusão", 1],
+    [["No lugar do mito: {acao}.", "Troca o mito por isso: {acao}."], "no lugar do mito", "salvamentos"],
+    [["Manda pra quem ainda repete esse mito. Três provas, sem desculpa."], "manda pra essa pessoa", "envios + replay"]] },
+  { tipo: "carta", capa: "Pro meu eu do passado", por: "Falar com o eu do passado emociona quem está começando, e quem já passou por isso manda para um iniciante.",
+    g: ["Se eu voltasse ao meu primeiro dia, diria só isso.", "Carta pro meu eu do primeiro dia em {N}. Só uma coisa."], c: [
+    [["Você vai achar que {N} é {o}.", "Você vai tratar {N} igual {ao}."], "você vai achar…", "retenção"],
+    [["Vai jurar que {e} {p}.", "Vai acreditar que {e} {p}."], "vai jurar", "conclusão"],
+    [["E vai doer descobrir que {e} {f}.", "Vai doer quando perceber que {e} {f}."], "vai doer", "comentários"],
+    [["Mas calma. É isso que te faz ficar."], "calma", "comentários", 1],
+    [["Então começa por aqui: {acao}.", "Faz só isso no começo: {acao}."], "comece por aqui", "salvamentos"],
+    [["Manda pra alguém que tá no primeiro dia. Eu diria só isso."], "manda pra quem tá começando", "envios + replay"]] },
+  { tipo: "detetive", capa: "Olha esse detalhe", por: "Um detalhe que ninguém viu faz a pessoa rever o vídeo e chamar alguém para olhar também.",
+    g: ["Repara nesse detalhe. Quase ninguém percebe.", "Tem uma pista escondida em {N}. Olha só."], c: [
+    [["A pista é {o}.", "Detalhe que ninguém liga: {o}."], "a pista", "retenção"],
+    [["Todo mundo acha que {e} {p}.", "A gente acha que {e} {p}."], "parece que…", "conclusão"],
+    [["Repara de novo: {e} {f}.", "Agora olha com lupa: {e} {f}."], "repara de novo", "replay"],
+    [["{A}: mesma pista."], "{A}", "conclusão", 1],
+    [["Caso resolvido: {acao}.", "Conclusão do caso: {acao}."], "caso resolvido", "salvamentos"],
+    [["Manda pra quem nunca reparou nisso. Repara de novo nesse detalhe."], "manda pra quem não reparou", "envios + replay"]] },
+  { tipo: "cronômetro", capa: "Valendo", por: "O relógio na tela segura até o fim, e passos rápidos viram algo para salvar e repassar.",
+    g: ["Você tem {d} segundos pra resolver isso. Valendo.", "Cronômetro ligado: {d} segundos e você sai daqui resolvido."], c: [
+    [["Passo um: pensa {no}.", "Passo um: lembra {do}."], "1", "retenção"],
+    [["Passo dois: aceita que {e} {f}.", "Passo dois: entende que {e} {f}."], "2", "conclusão"],
+    [["Passo três: em {N}, {x} é {acao}.", "Passo três: {acao}."], "3", "salvamentos"],
+    [["Pronto. Ainda sobrou tempo.", "Pronto. Sobrou tempo."], "pronto", "replay", 1],
+    [["Salva pra fazer agora e manda pra quem sempre adia isso. Valendo de novo."], "salva e manda", "envios + replay"]] },
+  { tipo: "fofoca", capa: "Fofoca do dia", por: "Tom de fofoca prende pela curiosidade e é feito para ser repassado à amiga.",
+    g: ["Senta que lá vem fofoca de {N}. E ninguém te contou.", "Fofoca quentinha de {N}. Ninguém te contou ainda."], c: [
+    [["Sabe {o}? Pois é.", "Lembra {do}? Então."], "sabe quem?", "retenção"],
+    [["Todo mundo jurava que {e} {p}.", "Diziam por aí que {e} {p}."], "diziam que…", "conclusão"],
+    [["Mentira. {E} {f}.", "Descobriram que {e} {f}. Um escândalo."], "mentira!", "comentários"],
+    [["E em {N} tem gente fazendo igualzinho."], "e tem gente igual", "comentários", 1],
+    [["Moral da fofoca: {acao}.", "Moral da história: {acao}."], "moral da história", "salvamentos"],
+    [["Manda pra sua amiga fofoqueira de {N}. Senta que tem mais."], "manda pra ela", "envios + replay"]] },
+  { tipo: "tribunal", capa: "Julgamento", por: "Julgar um hábito comum faz cada um pensar no 'réu' que conhece e marcar essa pessoa.",
+    g: ["Hoje esse hábito vai a julgamento. E a culpa é sua?", "Abre a sessão: tem um réu em {N}. Será que é você?"], c: [
+    [["O réu: tratar {N} igual {ao}.", "Réu de hoje: {o}."], "o réu", "retenção"],
+    [["A defesa diz que {e} {p}.", "A defesa jura que {e} {p}."], "a defesa", "conclusão"],
+    [["A prova: {e} {f}.", "Prova da acusação: {e} {f}."], "a prova", "comentários"],
+    [["{A}: mesmo crime."], "{A}", "conclusão", 1],
+    [["Veredito: culpado. A pena: {acao}.", "Sentença: {acao}, por trinta dias."], "veredito", "salvamentos"],
+    [["Manda pro réu, você sabe quem é. O próximo julgamento já começa."], "manda pro réu", "envios + replay"]] },
+];
+const GANCHOS_ALT = [
+  ["metáfora", "{O} explica {N} melhor que qualquer curso. Sério."],
+  ["pergunta", "Por que ninguém te conta a verdade sobre isso?"],
+  ["ordem", "Para tudo antes de cometer esse erro."],
+  ["acusação", "Te enganaram. E foi de propósito?"],
+  ["público", "{P}, presta atenção nisso."],
+];
+const ASSUNTOS = ["o erro mais comum de quem começa em {N}", "o conselho mais repetido de {N}", "a parte de {N} que todo mundo pula",
+  "o que separa amador de profissional em {N}", "o gasto escondido de {N}", "o hábito que mais atrasa quem faz {N}",
+  "a pergunta que todo cliente de {N} faz", "a primeira semana em {N}"];
+// Direção de câmera por formato: abertura, 3 cenas do meio (em ciclo) e fechamento que volta ao início.
+const VISUAIS = [
+  ["Close no rosto, olhando na lente, já falando na primeira palavra.", "Corte seco para um enquadramento mais aberto.", "Zoom rápido no rosto na palavra mais forte.", "Mostra o objeto ou a tela que prova o que você diz.", "Volta ao close da abertura, mesma posição."],
+  ["Câmera na mão, mostrando a cena como se fosse o olhar de quem assiste.", "Anda com a câmera até o detalhe.", "Sua mão entra no quadro e aponta.", "Corte para o resultado visto em primeira pessoa.", "Volta ao primeiro plano, mesmo ângulo do início."],
+  ["Imagem do dia a dia que causa estranhamento; a voz começa junto.", "Corte para uma cena real do seu trabalho.", "Detalhe em close (mãos, tela ou objeto).", "Imagem do resultado.", "A mesma imagem da abertura."],
+  ["Personagem 1 (você de boné) fala direto para a câmera.", "Personagem 2 (você sem boné) responde, corte seco.", "Personagem 1 reage em silêncio.", "Personagem 2 entrega a resposta.", "Os dois no mesmo quadro, tela dividida."],
+  ["Você na frente de um print ou manchete sobre o assunto.", "Aponta para a parte do print que importa.", "Troca o fundo por outro print ou número.", "O fundo some e fica você em close.", "Volta ao print da abertura."],
+  ["Número grande na tela e seu rosto ao lado.", "O contador muda, corte seco.", "O contador muda, ângulo diferente.", "Último item do contador, com zoom.", "O contador zera e volta ao início."],
+  ["Começa andando, já falando.", "Continua andando, sem cortes.", "Para em frente ao objeto que prova o ponto.", "Vira para a câmera e diminui o ritmo.", "Termina no mesmo lugar onde começou."],
+  ["Tela dividida: expectativa à esquerda, realidade à direita.", "O lado da expectativa ganha destaque.", "O lado da realidade ganha destaque.", "Os dois lados juntos, com o resultado.", "Volta à divisão da abertura."],
+];
+
+function limpar(t) {
+  let s = String(t).trim().replace(/[.!?…]+$/, "");
+  if (s.length > 1 && s[1] !== s[1].toUpperCase()) s = s[0].toLowerCase() + s.slice(1);
+  return s;
+}
+const maiuscula = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const etiqueta = (t) => "#" + t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+function embaralhar(lista, r) { const l = [...lista]; for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; } return l; }
+
+// Monta o substituidor de {chaves} para um nicho/assunto/objeto/ação.
+function preenchedor({ N, A, P, O, acao, d }) {
+  const [art, ...resto] = O.o.split(" "), nome = resto.join(" "), fem = art === "a";
+  const mapa = { N, A, P, d, o: O.o, O: maiuscula(O.o), e: O.e, E: maiuscula(O.e), p: O.p, f: O.f, x: O.x, c: O.c, acao,
+    ao: (fem ? "à " : "ao ") + nome, do: (fem ? "da " : "do ") + nome, no: (fem ? "na " : "no ") + nome };
+  return (t) => maiuscula(t.replace(/\{(\w+)\}/g, (_, k) => mapa[k] ?? ""));
+}
+
+function motorRoteiro(b) {
+  const r = prng(hash(b.col.semente + "|" + b.nicho + "|" + b.tema));
+  const um = (l) => l[Math.floor(r() * l.length)];
+  const N = limpar(b.nicho);
+  const A = b.tema ? limpar(b.tema) : um(ASSUNTOS).replace("{N}", N);
+  const P = b.publico ? maiuscula(limpar(b.publico)) : "";
+  const O = um(OBJETOS), acao = um(ACOES);
+  const E = ESTRUTURAS[Math.max(0, ANGULOS.indexOf(b.col.angulo))];
+  const V = VISUAIS[Math.max(0, FORMATOS.indexOf(b.col.formato))];
+  const sub = preenchedor({ N, A, P, O, acao, d: b.duracao });
+  const gancho = um(E.g);
+  let cenas = [{ f: gancho, t: "{A}", s: "retenção 3s" }, ...E.c.map(([vs, t, s, opt]) => ({ f: um(vs), t, s, opt }))];
+  const segs = (c) => Math.min(6, Math.max(2, Math.ceil(palavras(sub(c.f)) / PPS)));
+  const soma = () => cenas.reduce((a, c) => a + segs(c), 0);
+  // Cabe na duração: primeiro saem as cenas opcionais, depois as do meio.
+  for (let i = cenas.length - 2; i > 0 && soma() > b.duracao; i--) if (cenas[i].opt) cenas.splice(i, 1);
+  while (soma() > b.duracao && cenas.length > 3) cenas.splice(Math.floor(cenas.length / 2), 1);
+  const escala = Math.min(1, b.duracao / soma());
+  let t = 0;
+  const ultima = cenas.length - 1;
+  const saida = cenas.map((c, i) => {
+    const inicio = t;
+    t = i === ultima ? Math.min(b.duracao, t + segs(c)) : t + Math.max(2, Math.round(segs(c) * escala));
+    return { inicio, fim: Math.max(t, inicio + 2), fala: sub(c.f), texto_tela: sub(c.t), sinal: c.s,
+      visual: i === 0 ? V[0] : i === ultima ? V[4] : V[1 + ((i - 1) % 3)] };
+  });
+  const outros = E.g.filter((g) => g !== gancho).map((g) => [E.tipo, g]);
+  const alts = embaralhar([...outros, ...GANCHOS_ALT.filter((g) => g[0] !== "público" || P)], r).slice(0, 2);
+  return {
+    titulo: E.capa,
+    ideia_central: `${E.por} A metáfora do roteiro: ${O.o}. Regra criativa do dado: ${b.col.restricao}.`,
+    emocao: b.col.emocao,
+    gatilho_de_envio: saida[ultima].fala.split(/(?<=[.?!])\s/)[0],
+    ganchos: [[E.tipo, gancho], ...alts].map(([tipo, f]) => ({ tipo, fala: sub(f), texto_tela: sub("{A}"), visual: V[0] })),
+    cenas: saida,
+    loop: "A última frase retoma a abertura e a última imagem repete a primeira, então o replay parece continuação.",
+    cta: { tipo: "envio", fala: saida[ultima].fala },
+    legenda: `${maiuscula(A)}, explicado com ${O.o}. Às vezes o óbvio só aparece quando a gente olha de lado. Salva e manda pra quem precisa ver isso. ${etiqueta(N)}${P ? " " + etiqueta(P) : ""}`,
+    capa: E.capa,
+    audio: `Nada de música no primeiro segundo; depois um áudio em alta nos Reels, baixo, no clima de ${b.col.emocao.split(" (")[0]}.`,
+    sinais: {
+      retencao_3s: "A primeira frase abre uma pergunta e a tela mostra o assunto, diferente da fala.",
+      conclusao: `A comparação com ${O.o} só se resolve no fim.`,
+      replay: "O fechamento repete a abertura, e o vídeo emenda sozinho.",
+      envios: E.por,
+      salvamentos: "A ação prática é curta e fácil de guardar para depois.",
+      comentarios: "A comparação inesperada faz as pessoas contarem a versão delas.",
+    },
+  };
+}
+
+function motorIdeias(b) {
+  const r = prng(hash(novaSemente() + "|" + b.nicho));
+  const N = limpar(b.nicho);
+  const assuntos = embaralhar(ASSUNTOS, r), objetos = embaralhar(OBJETOS, r);
+  return embaralhar(ESTRUTURAS.map((_, i) => i), r).slice(0, 5).map((ai, k) => {
+    const A = assuntos[k].replace("{N}", N), E = ESTRUTURAS[ai], O = objetos[k];
+    const sub = preenchedor({ N, A, P: "", O, acao: "", d: b.duracao });
+    return { titulo: E.capa, gancho: sub(E.g[0]), emocao: EMOCOES[Math.floor(r() * EMOCOES.length)].split(" (")[0],
+      por_que: `${E.por} Metáfora: ${O.o}.`, angulo: ANGULOS[ai], assunto: A };
+  });
+}
+
+// ===== Estado e utilidades =====
 const $ = (id) => document.getElementById(id);
-const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const guardar = { ler(k, p) { try { return JSON.parse(localStorage.getItem(k)) ?? p; } catch { return p; } },
-                  gravar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
-let semente = '';
-let atual = null;
-let CHAVE_HIST = 'historico';
+const esc = (s = "") => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const loja = { ler(k, p) { try { return JSON.parse(localStorage.getItem(k)) ?? p; } catch { return p; } }, gravar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const tc = (s) => `00:${String(s).padStart(2, "0")}`;
+let col = colidir(novaSemente());
+let duracao = 30;
+let atual = { r: EXEMPLO, col: colidir("K7P2Q"), duracao: 40, exemplo: true };
+let ideias = null;
+let sample = null;
+let ocupado = false;
 
-async function rolar(s) {
-  const c = await (await fetch('/api/dado' + (s ? '?s=' + encodeURIComponent(s) : ''))).json();
-  semente = c.semente;
-  $('dado').innerHTML = `<div class="cod">#${esc(c.semente)}</div>
-    <div><b>Emoção</b> ${esc(c.emocao)}</div><div><b>Ângulo</b> ${esc(c.angulo)}</div>
-    <div><b>Formato</b> ${esc(c.formato)}</div><div><b>Restrição</b> ${esc(c.restricao)}</div>`;
+const ERROS = {
+  not_granted: "Para criar roteiros, permita que esta página use o Claude (o pedido aparece ao clicar).",
+  sampling_disabled: "O Claude não está disponível para esta conta.",
+  rate_limited: "Muitos pedidos seguidos ou limite de uso atingido. Espere um pouco e tente de novo.",
+  session_expired: "Sua sessão expirou. Entre de novo no Claude.",
+  refused: "O Claude recusou este pedido. Mude o tema ou o nicho.",
+  invalid_json: "A resposta veio fora do formato. Clique de novo para tentar outra vez.",
+  empty_completion: "A resposta veio vazia. Tente de novo.",
+};
+const msgErro = (e) => ERROS[e?.code] || "Algo falhou na conexão com o Claude. Tente de novo.";
+
+function status(t, erro) { $("status").textContent = t; $("status").classList.toggle("erro", !!erro); }
+function travar(sim) { ocupado = sim; ["criar", "semIdeia", "rolar"].forEach((id) => ($(id).disabled = sim)); document.querySelectorAll("[data-acao]").forEach((b) => (b.disabled = sim)); }
+
+function mostrarDado() {
+  $("semente").textContent = "#" + col.semente;
+  $("colisao").innerHTML = `<dt>emoção</dt><dd>${esc(col.emocao)}</dd><dt>ângulo</dt><dd>${esc(col.angulo)}</dd><dt>formato</dt><dd>${esc(col.formato)}</dd><dt>regra</dt><dd>${esc(col.restricao)}</dd>`;
 }
 
-function dados() {
-  return { nicho: $('nicho').value, tema: $('tema').value, publico: $('publico').value,
-           tom: $('tom').value, duracao: Number($('duracao').value), semente };
+function briefing() {
+  return { nicho: $("nicho").value.trim(), tema: $("tema").value.trim(), publico: $("publico").value.trim(), tom: $("tom").value.trim(), duracao, col };
 }
 
-async function gerar(e) {
-  e?.preventDefault();
-  if (!$('nicho').value.trim()) return $('nicho').focus();
-  $('gerar').disabled = true; $('gerar').textContent = 'Escrevendo…'; $('erro').textContent = '';
+// ===== Chamadas ao Claude =====
+const usarIA = () => !!sample && $("motor").value === "ia";
+
+function entregar(r, b, motor) {
+  r.ganchos = Array.isArray(r.ganchos) ? r.ganchos : [];
+  atual = { r, col: b.col, duracao: b.duracao, briefing: b, exemplo: false, motor };
+  salvarHistorico();
+  ideias = null;
+  render();
+  $("folha").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function criarRoteiro(ajuste) {
+  const b = briefing();
+  if (!b.nicho) { status("Escreva seu nicho para começar.", true); $("nicho").focus(); return; }
+  if (!usarIA()) {
+    entregar(motorRoteiro(b), b, true);
+    status("Pronto. Toque em qualquer fala para ajustar ao seu jeito de falar.");
+    return;
+  }
+  travar(true);
+  const t0 = Date.now();
+  const relogio = setInterval(() => status(`Escrevendo seu roteiro… ${Math.round((Date.now() - t0) / 1000)}s`), 1000);
+  status("Escrevendo seu roteiro…");
   try {
-    const r = await fetch('/api/roteiro', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(dados()) });
-    const j = await r.json();
-    if (r.status === 401) location.href = '/login';
-    if (!r.ok) throw new Error(j.erro || 'Falha ao gerar.');
-    mostrarCota(j.uso_mes, j.limite_mensal);
-    mostrar(j, true);
-  } catch (err) { $('erro').textContent = err.message; }
-  finally { $('gerar').disabled = false; $('gerar').textContent = 'Criar roteiro'; }
-}
-
-function cor(n) { return n >= 85 ? 'var(--ok)' : n >= 65 ? 'var(--warn)' : 'var(--bad)'; }
-
-function mostrar(r, salvar) {
-  atual = r;
-  const s = r.roteiro, v = r.viralometro;
-  const total = s.roteiro.at(-1)?.fim_s || 1;
-  const maximos = { gancho: 25, duracao: 25, ritmo: 15, loop: 10, cta: 15, originalidade: 10 };
-  $('saida').innerHTML = `
-  <div class="card">
-    <div class="placar">
-      <div class="nota" style="color:${cor(v.total)}">${v.total}</div>
-      <div><b>${esc(v.nivel)}</b><div class="meta">~${v.segundos_estimados}s · ${v.palavras} palavras · dado #${esc(r.colisao.semente)} · ${esc(r.modelo)} · US$ ${r.custo_usd}${r.reescrito ? ' · reescrito 1x' : ''}</div></div>
-    </div>
-    <div class="sinais">${Object.entries(v.notas).map(([k, n]) => `<div>${k}<div class="barra"><i style="width:${(n / maximos[k]) * 100}%"></i></div></div>`).join('')}</div>
-    ${v.alertas.map((a) => `<p class="alerta">⚠ ${esc(a)}</p>`).join('')}
-  </div>
-  <div class="card">
-    <span class="tag">ideia</span>
-    <h2 style="margin:6px 0">${esc(s.titulo_interno)}</h2>
-    <p style="margin:0">${esc(s.ideia_central)}</p>
-    <p class="meta">❤️ ${esc(s.emocao_dominante)}<br>📨 ${esc(s.gatilho_de_envio)}</p>
-  </div>
-  <div class="card">
-    <span class="tag">3 ganchos para testar (use Reels de teste)</span>
-    ${s.ganchos.map((g) => `<div class="gancho"><div class="fala">“${esc(g.fala)}”</div>
-      <div class="meta">${esc(g.tipo)} · tela: ${esc(g.texto_tela)} · ${esc(g.visual)}</div></div>`).join('')}
-  </div>
-  <div class="card">
-    <span class="tag">roteiro · ${total}s</span>
-    <div class="timeline">${s.roteiro.map((c) => `<i style="flex:${Math.max(1, c.fim_s - c.inicio_s)}"></i>`).join('')}</div>
-    ${s.roteiro.map((c) => `<div class="linha"><div class="tempo">${c.inicio_s}–${c.fim_s}s</div><div>
-      <div class="fala">${esc(c.fala)}</div>
-      ${c.texto_tela ? `<div class="meta">🔤 ${esc(c.texto_tela)}</div>` : ''}
-      <div class="meta">🎥 ${esc(c.visual)}</div><div class="meta">🎯 ${esc(c.funcao)}</div></div></div>`).join('')}
-    <p class="meta">🔁 <b>Loop:</b> ${esc(s.loop)}<br>📣 <b>CTA (${esc(s.cta.tipo)}):</b> ${esc(s.cta.fala)}<br>
-      🖼 <b>Capa:</b> ${esc(s.texto_capa)}<br>🎵 <b>Áudio:</b> ${esc(s.audio_sugerido)}</p>
-    <div class="acoes">
-      <button id="btnTp">🎬 Teleprompter</button>
-      <button id="btnCopiar">📋 Copiar roteiro</button>
-      <button id="btnVariar">🎲 Mesma ideia, outro dado</button>
-    </div>
-  </div>
-  <div class="card"><span class="tag">legenda</span><pre style="margin-top:8px">${esc(s.legenda)}</pre>
-    <div class="acoes"><button id="btnLegenda">📋 Copiar legenda</button></div></div>
-  <div class="card"><span class="tag">por que o algoritmo entrega</span>
-    ${Object.entries(s.sinais_algoritmo).map(([k, t]) => `<p style="margin:8px 0"><b>${esc(k.replace('_', ' '))}:</b> ${esc(t)}</p>`).join('')}
-  </div>`;
-  $('btnTp').onclick = abrirTp;
-  $('btnCopiar').onclick = () => navigator.clipboard.writeText(s.roteiro.map((c) => `[${c.inicio_s}-${c.fim_s}s] ${c.fala}\n  tela: ${c.texto_tela}\n  visual: ${c.visual}`).join('\n\n'));
-  $('btnLegenda').onclick = () => navigator.clipboard.writeText(s.legenda);
-  $('btnVariar').onclick = async () => { await rolar(); gerar(); };
-  $('saida').scrollIntoView({ behavior: 'smooth' });
-  if (salvar) {
-    const h = guardar.ler(CHAVE_HIST, []);
-    h.unshift({ quando: Date.now(), r });
-    guardar.gravar(CHAVE_HIST, h.slice(0, 20));
-    historico();
+    const r = await sample.json(promptRoteiro(b, ajuste), { modelTier: "default", cache: false });
+    if (!r || !Array.isArray(r.cenas) || !r.cenas.length) throw { code: "invalid_json" };
+    status("");
+    entregar(r, b, false);
+  } catch (e) {
+    status(msgErro(e), true);
+  } finally {
+    clearInterval(relogio);
+    travar(false);
   }
 }
 
-function historico() {
-  const h = guardar.ler(CHAVE_HIST, []);
-  if (!h.length) return;
-  $('historico').classList.remove('vazio');
-  $('historico').innerHTML = h.map((x, i) => `<button data-i="${i}">${esc(x.r.roteiro.titulo_interno)} · ${x.r.viralometro.total}/100</button>`).join('');
-  $('historico').querySelectorAll('button').forEach((b) => b.onclick = () => mostrar(h[b.dataset.i].r, false));
+async function gerarIdeias() {
+  const b = briefing();
+  if (!b.nicho) { status("Escreva seu nicho e eu crio as ideias.", true); $("nicho").focus(); return; }
+  if (!usarIA()) {
+    ideias = motorIdeias(b);
+    status("Escolha uma ideia para virar roteiro.");
+    render();
+    $("folha").scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  travar(true);
+  status("Pensando em 5 ideias…");
+  try {
+    const lista = await sample.json(promptIdeias(b), { modelTier: "quick", cache: false });
+    if (!Array.isArray(lista) || !lista.length) throw { code: "invalid_json" };
+    ideias = lista.slice(0, 5);
+    status("Escolha uma ideia para virar roteiro.");
+    render();
+    $("folha").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    status(msgErro(e), true);
+  } finally {
+    travar(false);
+  }
 }
 
-// Teleprompter: rola no ritmo do roteiro e destaca a cena do segundo atual.
-let tpTimer = null;
-function abrirTp() {
-  const s = atual.roteiro;
-  $('tpTitulo').textContent = s.titulo_interno;
-  $('tpTexto').innerHTML = s.roteiro.map((c) => `<p><small>${c.inicio_s}s · ${esc(c.texto_tela)}</small>${esc(c.fala)}</p>`).join('');
-  $('tpTexto').style.transform = 'translateY(0)';
-  $('tpRelogio').textContent = '0.0s';
-  $('tp').classList.add('on');
+// ===== Renderização =====
+function render() {
+  const f = $("folha");
+  let html = "";
+  if (ideias) {
+    html += `<section class="bloco"><span class="selo">5 ideias para ${esc($("nicho").value)}</span><div class="ideias" style="margin-top:12px">${ideias.map((i, k) => `
+      <article class="ideia"><h3>${esc(i.titulo)}</h3>${i.assunto ? `<p>Assunto: ${esc(i.assunto)}</p>` : ""}<q>${lacunas(i.gancho)}</q>
+      <p>${esc(i.emocao)} · ${esc(i.por_que)}</p>
+      <button type="button" data-acao="ideia" data-k="${k}">Transformar em roteiro</button></article>`).join("")}</div></section>`;
+  }
+  const { r, duracao: alvo } = atual;
+  const v = avaliar(r, alvo);
+  const cor = v.total >= 85 ? "var(--ok)" : v.total >= 65 ? "var(--warn)" : "var(--bad)";
+  const total = r.cenas.at(-1)?.fim || 1;
+  const nomes = { gancho: "gancho", duracao: "duração", ritmo: "ritmo", loop: "loop", envio: "envio", original: "originalidade" };
+  html += `
+  <section class="bloco">
+    <div class="placar">
+      <div class="anel" style="--p:${v.total};--cor:${cor}"><span>${v.total}</span></div>
+      <div><h3>${esc(v.nivel)}</h3>
+        <div class="vazio">~${v.segundos}s de fala · ${v.palavras} palavras · dado #${esc(atual.col.semente)}${atual.exemplo ? " · exemplo" : ""}</div></div>
+    </div>
+    <div class="medidas">${Object.entries(v.n).map(([k, x]) => `<div class="medida">${nomes[k]} ${x}/${MAX[k]}<div class="bar"><i style="width:${(x / MAX[k]) * 100}%"></i></div></div>`).join("")}</div>
+    ${v.alertas.length ? `<ul class="alertas">${v.alertas.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>
+      ${atual.exemplo || atual.motor || !sample ? "" : `<div class="linha-btn" style="margin-top:12px"><button type="button" data-acao="corrigir">Corrigir esses pontos</button></div>`}` : ""}
+  </section>
+
+  <section class="bloco">
+    <span class="selo">${atual.exemplo ? "exemplo · finanças pessoais" : atual.motor ? "motor próprio" : "ia do claude"}</span>
+    <h3 class="titulo-roteiro">${esc(r.titulo)}</h3>
+    <p style="margin:0">${esc(r.ideia_central)}</p>
+    <div class="fatos">
+      <div class="fato"><b>emoção</b>${esc(r.emocao)}</div>
+      <div class="fato"><b>gatilho de envio</b>${esc(r.gatilho_de_envio)}</div>
+    </div>
+  </section>
+
+  <section class="bloco">
+    <h2>3 ganchos para testar</h2>
+    <div class="ganchos">${r.ganchos.map((g, i) => `<div class="gancho"><span class="n">G${i + 1}</span><div><q>${lacunas(g.fala)}</q>
+      <p>${esc(g.tipo)} · tela: ${lacunas(g.texto_tela)} · ${esc(g.visual)}</p></div></div>`).join("")}</div>
+    <p class="vazio" style="margin-top:10px">Poste o mesmo vídeo com ganchos diferentes como Reels de teste e mantenha o que segurar mais gente.</p>
+  </section>
+
+  <section class="bloco">
+    <h2>Folha de gravação · ${total}s</h2>
+    <div class="regua" aria-hidden="true">${r.cenas.map((c, i) => `<i style="flex:${Math.max(1, c.fim - c.inicio)}"><span>${i + 1}</span></i>`).join("")}</div>
+    <div class="escala"><span>00:00</span><span>${tc(total)}</span></div>
+    <p class="vazio" style="margin-top:10px">Toque em qualquer fala para ajustar ao seu jeito.</p>
+    ${r.cenas.map((c, i) => `<div class="cena"><div class="tc">${tc(c.inicio)}<small>→ ${tc(c.fim)}</small></div><div>
+      <p class="fala" contenteditable="true" spellcheck="true" data-cena="${i}" aria-label="Fala da cena ${i + 1}">${lacunas(c.fala)}</p>
+      <div class="direcao">${c.texto_tela ? `<span><b>Tela:</b> ${lacunas(c.texto_tela)}</span>` : ""}<span><b>Câmera:</b> ${esc(c.visual)}</span></div>
+      <div class="sinal">${esc(c.sinal)}</div></div></div>`).join("")}
+    <div class="fatos">
+      <div class="fato"><b>loop</b>${esc(r.loop)}</div>
+      <div class="fato"><b>cta · ${esc(r.cta?.tipo)}</b>${esc(r.cta?.fala)}</div>
+      <div class="fato"><b>capa</b>${esc(r.capa)}</div>
+      <div class="fato"><b>áudio</b>${esc(r.audio)}</div>
+    </div>
+    <div class="linha-btn" style="margin-top:14px">
+      <button type="button" data-acao="tp">🎬 Teleprompter</button>
+      <button type="button" data-acao="copiar">Copiar roteiro</button>
+      ${atual.exemplo ? "" : `<button type="button" data-acao="falas">Reescrever as falas</button><button type="button" data-acao="variar">Outro dado</button>`}
+    </div>
+  </section>
+
+  <section class="bloco">
+    <h2>Legenda</h2>
+    <pre class="legenda" id="legendaTxt">${lacunas(r.legenda)}</pre>
+    <button type="button" data-acao="legenda">Copiar legenda</button>
+  </section>
+
+  <section class="bloco">
+    <h2>Por que o algoritmo entrega</h2>
+    <div class="sinais">${Object.entries(r.sinais || {}).map(([k, t]) => `<div><b>${esc(k.replace("_", " "))}</b>${esc(t)}</div>`).join("")}</div>
+  </section>`;
+
+  const hist = loja.ler("historico", []);
+  html += `<section class="bloco"><h2>Seus roteiros</h2><div class="hist" style="margin-top:10px">${
+    hist.length ? hist.map((h, i) => `<button type="button" data-acao="hist" data-k="${i}"><span>${esc(h.r.titulo)}</span><span>${avaliar(h.r, h.duracao).total}</span></button>`).join("")
+    : `<p class="vazio">Os roteiros que você criar ficam guardados aqui, neste navegador.</p>`}</div></section>`;
+
+  f.innerHTML = html;
+  if (ocupado) travar(true);
 }
-function fecharTp() { clearInterval(tpTimer); $('tp').classList.remove('on'); $('tpConta').hidden = true; }
-function iniciarTp() {
-  clearInterval(tpTimer);
-  const cenas = atual.roteiro.roteiro, ps = [...$('tpTexto').querySelectorAll('p')];
-  let n = 3; $('tpConta').hidden = false; $('tpConta').textContent = n;
-  const conta = setInterval(() => {
-    if (--n > 0) return ($('tpConta').textContent = n);
-    clearInterval(conta); $('tpConta').hidden = true;
-    const t0 = performance.now(), fim = cenas.at(-1).fim_s;
+
+const lacunas = (s) => esc(s).replace(/\[([^\]]+)\]/g, '<mark class="lacuna">[$1]</mark>');
+
+function salvarHistorico() {
+  const h = loja.ler("historico", []);
+  h.unshift({ r: atual.r, col: atual.col, duracao: atual.duracao, briefing: atual.briefing, motor: atual.motor });
+  loja.gravar("historico", h.slice(0, 25));
+  atual.hist = 0;
+}
+
+// Fala editada na folha: atualiza o roteiro, o teleprompter, a nota e o histórico.
+$("folha").addEventListener("focusout", (e) => {
+  const p = e.target.closest("[data-cena]");
+  if (!p) return;
+  const i = +p.dataset.cena, novo = p.textContent.replace(/\s+/g, " ").trim();
+  if (!novo || novo === atual.r.cenas[i].fala) return;
+  atual.r.cenas[i].fala = novo;
+  if (atual.hist != null) {
+    const h = loja.ler("historico", []);
+    if (h[atual.hist]) { h[atual.hist].r = atual.r; loja.gravar("historico", h); }
+  }
+});
+
+async function copiar(texto, botao) {
+  const antes = botao.textContent;
+  try { await navigator.clipboard.writeText(texto); botao.textContent = "Copiado ✓"; }
+  catch { botao.textContent = "Selecione e copie"; }
+  setTimeout(() => (botao.textContent = antes), 1600);
+}
+
+$("folha").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-acao]");
+  if (!b || ocupado) return;
+  const a = b.dataset.acao, r = atual.r;
+  if (a === "ideia") {
+    const i = ideias[+b.dataset.k];
+    if (i.angulo) { // ideia do motor próprio: mantém o ângulo escolhido
+      $("tema").value = i.assunto;
+      col = { ...col, angulo: i.angulo };
+      mostrarDado();
+    } else {
+      $("tema").value = `${i.titulo}. Gancho sugerido: "${i.gancho}"`;
+    }
+    criarRoteiro();
+  }
+  if (a === "corrigir") {
+    const v = avaliar(r, atual.duracao);
+    restaurarBriefing(atual.briefing);
+    criarRoteiro(v.alertas.map((x) => "- " + x).join("\n"));
+  }
+  if (a === "variar") { restaurarBriefing(atual.briefing); rolar(); criarRoteiro(); }
+  if (a === "falas") { // mesma estrutura e câmera, falas novas
+    restaurarBriefing(atual.briefing);
+    col = { ...colidir(novaSemente()), angulo: atual.col.angulo, formato: atual.col.formato, restricao: atual.col.restricao, emocao: atual.col.emocao };
+    mostrarDado();
+    criarRoteiro();
+  }
+  if (a === "tp") abrirTp();
+  if (a === "copiar") copiar(r.cenas.map((c) => `[${tc(c.inicio)}–${tc(c.fim)}] ${c.fala}\n  Tela: ${c.texto_tela}\n  Câmera: ${c.visual}`).join("\n\n") + `\n\nCTA: ${r.cta?.fala}\nLoop: ${r.loop}`, b);
+  if (a === "legenda") copiar(r.legenda, b);
+  if (a === "hist") {
+    const h = loja.ler("historico", [])[+b.dataset.k];
+    atual = { r: h.r, col: h.col, duracao: h.duracao, briefing: h.briefing, exemplo: false, motor: h.motor, hist: +b.dataset.k };
+    ideias = null; render(); $("folha").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+});
+
+function restaurarBriefing(b) {
+  if (!b) return;
+  $("nicho").value = b.nicho; $("tema").value = b.tema; $("publico").value = b.publico; $("tom").value = b.tom;
+  marcarDuracao(b.duracao); col = b.col; mostrarDado();
+}
+
+// ===== Teleprompter =====
+let tpTimer = null, tpConta = null;
+function abrirTp() {
+  const r = atual.r;
+  $("tpTitulo").textContent = r.titulo;
+  $("tpTexto").innerHTML = r.cenas.map((c) => `<p><small>${tc(c.inicio)} · ${esc(c.texto_tela)}</small>${esc(c.fala)}</p>`).join("");
+  $("tpTexto").style.transform = "translateY(0)";
+  $("tpRel").textContent = "00.0";
+  $("tp").hidden = false;
+  navigator.wakeLock?.request?.("screen").catch(() => {});
+}
+function fecharTp() { clearInterval(tpTimer); clearInterval(tpConta); $("tpConta").hidden = true; $("tp").hidden = true; }
+function gravarTp() {
+  clearInterval(tpTimer); clearInterval(tpConta);
+  const cenas = atual.r.cenas, ps = [...$("tpTexto").querySelectorAll("p")];
+  let n = 3; $("tpConta").hidden = false; $("tpConta").textContent = n;
+  tpConta = setInterval(() => {
+    if (--n > 0) { $("tpConta").textContent = n; return; }
+    clearInterval(tpConta); $("tpConta").hidden = true;
+    const t0 = performance.now(), fim = cenas.at(-1).fim;
     tpTimer = setInterval(() => {
       const t = (performance.now() - t0) / 1000;
-      $('tpRelogio').textContent = t.toFixed(1) + 's';
-      const i = Math.max(0, cenas.findIndex((c) => t >= c.inicio_s && t < c.fim_s));
-      ps.forEach((p, j) => p.classList.toggle('agora', j === i));
-      $('tpTexto').style.transform = `translateY(${-ps[i].offsetTop + ps[0].offsetTop}px)`;
-      if (t >= fim) { clearInterval(tpTimer); $('tpRelogio').textContent = '✔ ' + fim + 's'; }
+      $("tpRel").textContent = t.toFixed(1).padStart(4, "0");
+      let i = cenas.findIndex((c) => t >= c.inicio && t < c.fim); if (i < 0) i = cenas.length - 1;
+      ps.forEach((p, j) => p.classList.toggle("agora", j === i));
+      $("tpTexto").style.transform = `translateY(${-(ps[i].offsetTop - ps[0].offsetTop)}px)`;
+      if (t >= fim) { clearInterval(tpTimer); $("tpRel").textContent = "✓ " + fim + "s"; }
     }, 100);
   }, 800);
 }
+$("tpGravar").onclick = gravarTp;
+$("tpFechar").onclick = fecharTp;
 
-$('form').onsubmit = gerar;
-$('rolar').onclick = () => rolar();
-$('semIdeia').onclick = async () => { $('tema').value = ''; await rolar(); gerar(); };
-$('exemplo').onclick = async (e) => { e.preventDefault(); mostrar(await (await fetch('/api/exemplo')).json(), false); };
-$('tpIniciar').onclick = iniciarTp;
-$('tpFechar').onclick = fecharTp;
-['nicho', 'publico', 'tom'].forEach((k) => { $(k).value = guardar.ler('campo_' + k, ''); $(k).onchange = () => guardar.gravar('campo_' + k, $(k).value); });
-function mostrarCota(uso, limite) {
-  $('cota').textContent = limite == null ? `${uso} roteiros este mês` : `${uso}/${limite} roteiros este mês`;
+// ===== Controles do briefing =====
+function marcarDuracao(s) {
+  duracao = +s;
+  document.querySelectorAll("#tempos button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.s === duracao)));
 }
-async function entrar() {
-  const r = await fetch('/api/eu');
-  if (!r.ok) return (location.href = '/login');
-  const eu = await r.json();
-  CHAVE_HIST = 'historico_' + eu.id; // cada pessoa vê só o próprio histórico neste navegador
-  $('quem').textContent = eu.nome || eu.email;
-  $('linkAdmin').hidden = eu.papel !== 'admin';
-  mostrarCota(eu.uso_mes, eu.limite_mensal);
-  rolar();
-  historico();
-}
-$('sair').onclick = async (e) => {
-  e.preventDefault();
-  await fetch('/api/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
-  location.href = '/login';
-};
-$('trocarSenha').onclick = async (e) => {
-  e.preventDefault();
-  const atual = prompt('Senha atual:'); if (!atual) return;
-  const nova = prompt('Nova senha (mínimo 8 caracteres):'); if (!nova) return;
-  const r = await fetch('/api/senha', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ atual, nova }) });
-  const j = await r.json();
-  alert(r.ok ? 'Senha alterada.' : j.erro);
-};
-entrar();
+$("tempos").onclick = (e) => { const b = e.target.closest("button"); if (b) marcarDuracao(b.dataset.s); };
+function rolar() { col = colidir(novaSemente()); mostrarDado(); }
+$("rolar").onclick = rolar;
+$("briefing").onsubmit = (e) => { e.preventDefault(); if (!ocupado) criarRoteiro(); };
+$("semIdeia").onclick = () => { if (!ocupado) { $("tema").value = ""; gerarIdeias(); } };
+["nicho", "publico", "tom"].forEach((k) => { $(k).value = loja.ler("campo_" + k, ""); $(k).addEventListener("change", () => loja.gravar("campo_" + k, $(k).value)); });
+
+mostrarDado();
+render();
+
+// O motor próprio funciona para qualquer pessoa. Quem abre logado no Claude também pode usar a IA.
+(async () => {
+  sample = window.claude ? await window.claude.use("sample").catch(() => null) : null;
+  $("motorBox").hidden = !sample;
+  $("modo").textContent = sample ? "ia do claude disponível" : "pronto para criar";
+})();
 </script>
 </body>
 </html>

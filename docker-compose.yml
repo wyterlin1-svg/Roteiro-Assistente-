@@ -1,9 +1,7 @@
 services:
   roteirista:
     build: .
+    container_name: roteirista-40s
     restart: unless-stopped
-    env_file: .env
     ports:
-      - "127.0.0.1:3000:3000"   # só acessível pelo proxy (nginx/caddy) do próprio servidor
-    volumes:
-      - ./data:/app/data        # usuários e segredo da sessão: faça backup desta pasta
+      - "8080:80"   # troque 8080 pela porta que quiser no seu servidor

@@ -1,78 +1,60 @@
 # Roteirista 40s
 
-IA que cria roteiros de Reels do Instagram de até 40 segundos, escritos a partir dos sinais que o algoritmo usa para distribuir vídeos: retenção nos 3 primeiros segundos, tempo assistido, replay, **envios por DM**, salvamentos e comentários. Funciona também quando você está sem nenhuma ideia.
+Agente de roteiros de Reels de até 40 segundos, guiado pelo algoritmo do Instagram: gancho nos 3 primeiros segundos, emoção, cortes a cada 3 a 5 segundos, final que emenda no começo e um motivo para mandarem o vídeo para alguém.
 
-> Nenhuma ferramenta garante que um vídeo vai viralizar. Esta aqui faz cada roteiro cumprir as regras que aumentam essa chance, e audita o resultado antes de você gravar.
+- Escreve **todas as falas**, prontas para o teleprompter, e a **direção de câmera** de cada cena.
+- Falas fora da caixa: cada roteiro explica o assunto com um objeto do dia a dia que não tem nada a ver com o nicho.
+- Funciona para **qualquer pessoa**: sem cadastro, sem chave de API e sem custo por roteiro. Tudo roda no navegador de quem usa.
+- Uma página só, servida por um nginx leve.
 
-## O que tem de diferente
+## Subir no seu servidor (Docker)
 
-| Ideia | Por que importa |
-|---|---|
-| **Colisão criativa** 🎲 | Um "dado" sorteia emoção + ângulo + formato + **restrição** que não combinam entre si. A IA precisa resolver essa tensão, e isso tira ela do lugar-comum. Cada dado tem um código (ex.: `#K7P2Q`) que sempre gera a mesma combinação, então dá para repetir o que funcionou. Rolar o dado é local e não custa nada. |
-| **Gatilho de envio** 📨 | Todo roteiro define *para quem* o espectador mandaria o vídeo. Envios por DM são o sinal que mais leva um Reel a quem não segue a conta. |
-| **Gancho triplo** | Fala (até 12 palavras), texto na tela e ação visual nos 0–3s, com 3 variações para testar em Reels de teste (trial reels). |
-| **Loop obrigatório** 🔁 | O final emenda no começo, então o replay parece continuação. |
-| **Orçamento de palavras** ⏱ | Cerca de 2,6 palavras por segundo: 40s cabem em no máximo ~100 palavras. Cada cena tem tempo marcado. |
-| **Antifórmula** 🚫 | Bloqueia frases típicas de IA ("Você sabia que", "Neste vídeo", "mergulhar", "jornada"…) no prompt e confere de novo localmente. |
-| **Viralômetro** 📈 | Nota de 0 a 100 calculada no seu computador, sem custo: gancho, duração, ritmo de cortes, loop, tipo de CTA e originalidade. Se a nota fica abaixo de 65, o roteiro é reescrito **uma vez** automaticamente com os problemas apontados. |
-| **Teleprompter** 🎬 | Contagem 3-2-1 e texto que rola no tempo de cada cena. Já dá para gravar dali. |
-
-## Leve, rápido e barato
-
-- Uma única dependência (`@anthropic-ai/sdk`), sem framework e sem banco de dados. O histórico fica no navegador.
-- Uma chamada à IA por roteiro (no máximo duas, quando a reescrita automática entra), com resposta em JSON estruturado.
-- Cache de prompt no prompt do sistema, esforço de raciocínio `low` por padrão e custo de cada roteiro mostrado na tela.
-- O modelo é configurável: `claude-opus-5-5` (padrão, melhor escrita) ou `claude-haiku-5-5` (cerca de 40x mais barato).
-
-## Acesso por login (para vender a clientes)
-
-Cada cliente entra com e-mail e senha. Você administra tudo em `/admin`: cria acessos (com a mensagem pronta para enviar ao cliente), bloqueia, gera nova senha e define quantos roteiros por mês cada um pode gerar. A chave da API fica só no seu servidor.
-
-**Para instalar no seu servidor, siga o [INSTALAR.md](INSTALAR.md)** (Docker ou Node, com HTTPS).
-
-## Rodar no seu computador
-
-Requer Node.js 22 ou superior.
+Precisa de Docker com Compose no servidor.
 
 ```bash
-npm install
-cp .env.example .env                                   # coloque sua ANTHROPIC_API_KEY
-npm run usuarios -- admin voce@email.com SuaSenha123   # cria seu acesso
-npm start                                              # abre em http://localhost:3000
+git clone https://github.com/wyterlin1-svg/Roteiro-Assistente-.git roteirista
+cd roteirista
+docker compose up -d --build
 ```
 
-Depois de entrar, clique em **"Veja um roteiro de exemplo"** para conhecer a interface e o teleprompter sem gastar nada.
+Pronto: abra `http://IP-DO-SERVIDOR:8080`.
 
-Pelo terminal:
+Sem Compose:
 
 ```bash
-npm run roteiro -- "finanças pessoais"                          # sem ideia: a colisão cria a ideia
-npm run roteiro -- "confeitaria" "bolo que afunda no meio" --duracao 20
-npm run roteiro -- "academia" --semente K7P2Q --json
+docker build -t roteirista-40s .
+docker run -d --name roteirista-40s --restart unless-stopped -p 8080:80 roteirista-40s
 ```
 
-Testes: `npm test`
+Para usar outra porta, troque o `8080` no `docker-compose.yml` (ou no `-p`).
 
-## Estrutura
+## Atualizar
 
-```
-server.js               servidor HTTP (node:http) + API + login
-cli.js                  versão de terminal
-usuarios.js             gerenciar acessos pelo terminal
-public/index.html       interface e teleprompter (um arquivo, sem build)
-public/login.html       tela de login
-public/admin.html       painel de clientes
-src/contas/             usuários (arquivo JSON), senhas e sessões
-Dockerfile, docker-compose.yml  instalação no servidor
-src/motor/prompt.js     o "cérebro": regras do algoritmo + schema da resposta
-src/motor/colisao.js    dado da colisão criativa (determinístico por semente)
-src/motor/viralometro.js auditoria local dos roteiros
-src/motor/gerar.js      chamada à IA + reescrita automática
-src/exemplo.json        roteiro de exemplo (nota 100)
+```bash
+cd roteirista
+git pull
+docker compose up -d --build
 ```
 
-## API (requer login)
+## Domínio com HTTPS (opcional)
 
-`POST /api/roteiro` com `{ "nicho": "...", "tema": "", "publico": "", "tom": "", "duracao": 30, "semente": "K7P2Q" }`. Só `nicho` é obrigatório; sem `tema`, entra no modo sem ideia.
+Aponte o domínio para o servidor e coloque um proxy na frente do container. Com o [Caddy](https://caddyserver.com), que emite o certificado sozinho, o `/etc/caddy/Caddyfile` fica assim:
 
-`GET /api/dado?s=K7P2Q` devolve a colisão criativa (grátis).
+```
+roteiros.seudominio.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+## Verificar se está no ar
+
+`http://IP-DO-SERVIDOR:8080/saude` responde `ok`. O container também tem healthcheck: `docker ps` mostra `healthy`.
+
+## Arquivos
+
+```
+public/index.html    a página inteira (interface, motor de roteiros e teleprompter)
+nginx.conf           configuração do servidor web
+Dockerfile           imagem baseada em nginx:alpine
+docker-compose.yml   sobe o container na porta 8080
+```
