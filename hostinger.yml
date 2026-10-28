@@ -1,56 +1,39 @@
-# Roteirista 40s na Hostinger (VPS > Docker Manager), com login e senha,
+# Roteirista 40s na Hostinger (VPS > Docker Manager), com tela de login própria,
 # sem mexer no site principal (não usa as portas 80/443).
 #
 # ACESSOS: edite a linha USUARIOS abaixo, no formato usuario:senha,
 # separando cada pessoa por vírgula. Sem espaços e sem vírgula dentro da senha.
-# Para adicionar ou tirar alguém: edite a linha e faça o deploy de novo.
+# Para adicionar ou tirar alguém: edite a linha e implante de novo.
 #
-# As senhas são guardadas criptografadas dentro do container (sha512).
-# Depois de 5 tentativas por segundo, o servidor segura as próximas (contra robôs).
+# Não precisa montar imagem: usa o Node oficial e baixa os arquivos do GitHub ao ligar.
+# Para atualizar, basta reiniciar o container.
 
 services:
   roteirista:
-    image: nginx:1.27-alpine
+    image: node:22-alpine
     container_name: roteirista-40s
     restart: unless-stopped
     ports:
-      - "8081:80"   # se a 8081 estiver ocupada, troque só o primeiro número (ex.: "8090:80")
-    mem_limit: 64m
+      - "8081:3000"   # se a 8081 estiver ocupada, troque só o primeiro número (ex.: "8090:3000")
+    mem_limit: 128m
     cpus: 0.25
     environment:
       USUARIOS: "admin:TroqueEstaSenha123,cliente1:OutraSenha456"
+      NODE_ENV: production
+    working_dir: /app
+    user: node
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -e
-        [ -n "$$USUARIOS" ] || { echo "ERRO: preencha USUARIOS no formato usuario:senha"; exit 1; }
-        wget -qO /usr/share/nginx/html/index.html https://raw.githubusercontent.com/wyterlin1-svg/Roteiro-Assistente-/refs/heads/claude/roteirista-40s/public/index.html
-        : > /etc/nginx/.senhas
-        for par in $$(echo "$$USUARIOS" | tr ',' ' '); do
-          echo "$${par%%:*}:$$(mkpasswd -m sha512 "$${par#*:}")" >> /etc/nginx/.senhas
-        done
-        chown root:nginx /etc/nginx/.senhas && chmod 640 /etc/nginx/.senhas
-        echo "Acessos configurados: $$(cut -d: -f1 /etc/nginx/.senhas | tr '\n' ' ')"
-        cat > /etc/nginx/conf.d/default.conf <<'FIM'
-        limit_req_zone $$binary_remote_addr zone=login:1m rate=5r/s;
-        server {
-          listen 80;
-          root /usr/share/nginx/html;
-          add_header X-Content-Type-Options "nosniff" always;
-          add_header Referrer-Policy "same-origin" always;
-          location = /saude { access_log off; return 200 "ok\n"; }
-          location / {
-            limit_req zone=login burst=20 nodelay;
-            auth_basic "Roteirista 40s";
-            auth_basic_user_file /etc/nginx/.senhas;
-            add_header Cache-Control "no-cache" always;
-            try_files $$uri /index.html;
-          }
-        }
-        FIM
-        exec nginx -g 'daemon off;'
+        RAW=https://raw.githubusercontent.com/wyterlin1-svg/Roteiro-Assistente-/refs/heads/claude/roteirista-40s
+        mkdir -p public
+        wget -qO servidor.js "$$RAW/servidor.js"
+        wget -qO public/index.html "$$RAW/public/index.html"
+        wget -qO public/login.html "$$RAW/public/login.html"
+        exec node servidor.js
     healthcheck:
-      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/saude"]
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/saude"]
       interval: 30s
       timeout: 3s
       retries: 3

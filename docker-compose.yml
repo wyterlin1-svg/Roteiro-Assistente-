@@ -4,4 +4,6 @@ services:
     container_name: roteirista-40s
     restart: unless-stopped
     ports:
-      - "8080:80"   # troque 8080 pela porta que quiser no seu servidor
+      - "8080:3000"   # troque 8080 pela porta que quiser no seu servidor
+    environment:
+      USUARIOS: "admin:TroqueEstaSenha123"   # usuario:senha, separados por vírgula
