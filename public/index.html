@@ -96,6 +96,7 @@
   .titulo-roteiro { font: 800 clamp(24px, 3.4vw, 34px)/1.1 var(--f-display); letter-spacing: -0.02em; margin: 8px 0 6px; text-wrap: balance; }
   .fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
   .fato { background: var(--sunk); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .fato-largo { grid-column: 1 / -1; }
   .fato b { display: block; font: 600 11px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 2px; }
 
   .ganchos { display: grid; gap: 10px; margin-top: 10px; }
@@ -198,8 +199,8 @@
     <form class="painel" id="briefing" novalidate>
       <h2>Briefing</h2>
       <label>Nicho <input id="nicho" placeholder="finanças pessoais, confeitaria, academia…" autocomplete="off"></label>
-      <label>Tema <small>deixe vazio se estiver sem ideia</small>
-        <textarea id="tema" placeholder="por que ninguém consegue guardar dinheiro"></textarea></label>
+      <label>Detalhes do roteiro <small>opcional · descreva o que você quer: assunto, uma história sua, produto, tom, o que não pode faltar. Vazio = eu crio a ideia.</small>
+        <textarea id="tema" rows="4" placeholder="Ex.: quero falar sobre como guardar dinheiro ganhando pouco, contar que eu já estourei o cartão, tom leve e engraçado, terminar chamando para o link da bio."></textarea></label>
       <div class="duas">
         <label>Público <input id="publico" placeholder="mães de 30+"></label>
         <label>Tom <input id="tom" placeholder="direto, engraçado"></label>
@@ -349,7 +350,7 @@ Regras do JSON: todas as falas completas, sem colchetes nem lacunas; exatamente 
 function promptRoteiro(b, ajuste) {
   return [REGRAS, "", "PEDIDO",
     `Nicho: ${b.nicho}`,
-    `Tema: ${b.tema || "(sem ideia: crie a partir do nicho e da colisão)"}`,
+    b.tema ? `DETALHES DO CRIADOR (siga à risca; em caso de conflito, valem mais que a colisão):\n${b.tema}` : "Detalhes: (sem ideia: crie a partir do nicho e da colisão)",
     b.publico && `Público: ${b.publico}`, b.tom && `Tom: ${b.tom}`,
     `Duração máxima: ${b.duracao}s (no máximo ${Math.floor(b.duracao * PPS)} palavras faladas no total)`,
     "", `COLISÃO #${b.col.semente}`, `- Emoção: ${b.col.emocao}`, `- Ângulo: ${b.col.angulo}`, `- Formato: ${b.col.formato}`, `- Restrição: ${b.col.restricao}`,
@@ -573,11 +574,29 @@ function preenchedor({ N, A, P, O, acao, d }) {
   return (t) => maiuscula(t.replace(/\{(\w+)\}/g, (_, k) => mapa[k] ?? ""));
 }
 
+// Da descrição livre ("quero um roteiro sobre X, em tom Y…") tira só o assunto curto
+// que entra nas falas e no texto da tela. Os detalhes completos ficam visíveis no resultado
+// e vão inteiros para a IA quando ela está disponível.
+function extrairAssunto(texto) {
+  let s = String(texto).replace(/\s+/g, " ").trim().split(/[.!?;\n]/)[0];
+  s = s.replace(/^(eu\s+)?(quero|queria|gostaria( de)?|preciso( de)?|fa[cç]a|faz|crie|cria|criar|fazer|me d[aáê])\s+/i, "")
+    .replace(/^(um|uma)\s+/i, "")
+    .replace(/^(roteiro|v[ií]deo|reels?|post|conte[uú]do)\s*/i, "")
+    .replace(/^(que\s+)?(fale|falando|falar|explique|explicando|explicar|mostre|mostrando|mostrar)\s+/i, "")
+    .replace(/^(sobre|a respeito de|de|do|da)\s+/i, "")
+    .split(/,|\s[-–—]\s/)[0].trim();
+  const pal = s.split(" ");
+  if (pal.length > 9) s = pal.slice(0, 9).join(" ");
+  // Pedido vago ("algo engraçado", "uma ideia boa") não é assunto: o motor sorteia um.
+  if (/^(algo|alguma coisa|qualquer|um tema|uma ideia|ideia|tema)\b/i.test(s)) return "";
+  return s.length >= 3 ? limpar(s) : "";
+}
+
 function motorRoteiro(b) {
   const r = prng(hash(b.col.semente + "|" + b.nicho + "|" + b.tema));
   const um = (l) => l[Math.floor(r() * l.length)];
   const N = limpar(b.nicho);
-  const A = b.tema ? limpar(b.tema) : um(ASSUNTOS).replace("{N}", N);
+  const A = (b.tema && extrairAssunto(b.tema)) || um(ASSUNTOS).replace("{N}", N);
   const P = b.publico ? maiuscula(limpar(b.publico)) : "";
   const O = OBJETOS.find((o) => o.c === b.objeto) || um(OBJETOS), acao = um(ACOES);
   const E = ESTRUTURAS[Math.max(0, ANGULOS.indexOf(b.col.angulo))];
@@ -602,6 +621,7 @@ function motorRoteiro(b) {
   const outros = E.g.filter((g) => g !== gancho).map((g) => [E.tipo, g]);
   const alts = embaralhar([...outros, ...GANCHOS_ALT.filter((g) => g[0] !== "público" || P)], r).slice(0, 2);
   return {
+    assunto: A,
     genes: genesDe(b, O.c),
     titulo: E.capa,
     ideia_central: `${E.por} A metáfora do roteiro: ${O.o}. Regra criativa do dado: ${b.col.restricao}.`,
@@ -699,7 +719,7 @@ const ERROS = {
   sampling_disabled: "O Claude não está disponível para esta conta.",
   rate_limited: "Muitos pedidos seguidos ou limite de uso atingido. Espere um pouco e tente de novo.",
   session_expired: "Sua sessão expirou. Entre de novo no Claude.",
-  refused: "O Claude recusou este pedido. Mude o tema ou o nicho.",
+  refused: "O Claude recusou este pedido. Mude os detalhes ou o nicho.",
   invalid_json: "A resposta veio fora do formato. Clique de novo para tentar outra vez.",
   empty_completion: "A resposta veio vazia. Tente de novo.",
 };
@@ -723,6 +743,7 @@ const usarIA = () => !!sample && $("motor").value === "ia";
 function entregar(r, b, motor) {
   r.ganchos = Array.isArray(r.ganchos) ? r.ganchos : [];
   r.genes = r.genes || genesDe(b, b.objeto);
+  r.detalhes = b.tema || "";
   atual = { r, col: b.col, duracao: b.duracao, briefing: b, exemplo: false, motor, porque: b.porque };
   salvarHistorico();
   ideias = null;
@@ -1039,6 +1060,7 @@ function render() {
     <div class="fatos">
       <div class="fato"><b>emoção</b>${esc(r.emocao)}</div>
       <div class="fato"><b>gatilho de envio</b>${esc(r.gatilho_de_envio)}</div>
+      ${r.detalhes ? `<div class="fato fato-largo"><b>seus detalhes</b>${esc(r.detalhes)}${r.assunto && atual.motor ? `<br><span class="vazio">Assunto usado nas falas: “${esc(r.assunto)}”. Toque nas falas para incluir o resto do que você pediu.</span>` : ""}</div>` : ""}
     </div>
   </section>
 
