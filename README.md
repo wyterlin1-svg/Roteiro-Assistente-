@@ -63,6 +63,25 @@ Para ativar (uma vez, pelo administrador):
 7. Em **Configurar login comercial do Instagram**, use `https://roteiros.murinoi.com/instagram/desautorizar` como **URL de retorno de chamada de desautorização** e `https://roteiros.murinoi.com/exclusao-de-dados` como **URL de solicitação de exclusão de dados**.
 8. Opcional: no YAML, `RESPONSAVEL` (seu nome ou empresa) e `CONTATO_EMAIL` aparecem nas duas páginas.
 
+## IA gratuita com revezamento
+
+O servidor pode escrever os roteiros com várias IAs gratuitas, uma de reserva para a outra. Preencha no YAML as chaves que tiver (todas gratuitas, uma por provedor, na sua conta):
+
+| Variável | Onde pegar |
+|---|---|
+| `GEMINI_API_KEY` | aistudio.google.com/apikey |
+| `GROQ_API_KEY` | console.groq.com/keys |
+| `CEREBRAS_API_KEY` | cloud.cerebras.ai |
+| `OPENROUTER_API_KEY` | openrouter.ai/keys |
+| `MISTRAL_API_KEY` | console.mistral.ai/api-keys |
+| `GITHUB_MODELS_TOKEN` | github.com/settings/tokens (permissão Models) |
+
+- Os pedidos são distribuídos entre as IAs; a que bater no limite entra em pausa (1 h se for cota diária, alguns segundos se for por minuto, 6 h se a chave for inválida) e volta sozinha.
+- Se todas estiverem no limite, o motor próprio escreve o roteiro: o usuário nunca fica sem resposta.
+- Cada usuário pode fazer até 40 pedidos de IA por hora (`IA_LIMITE_HORA` muda isso).
+- O modelo de cada provedor pode ser trocado com `GEMINI_MODELO`, `GROQ_MODELO`, `CEREBRAS_MODELO`, `OPENROUTER_MODELO`, `MISTRAL_MODELO` e `GITHUB_MODELO`.
+- Dados do Instagram nunca são enviados a essas IAs.
+
 ## Atualizar
 
 **Automático.** A cada 5 minutos o servidor confere o GitHub:

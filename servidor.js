@@ -167,6 +167,22 @@ createServer(async (req, res) => {
       return enviar(res, 405, '{"erro":"metodo"}', json);
     }
 
+    if (pathname === "/api/ia") {
+      const json = { "content-type": "application/json; charset=utf-8" };
+      if (!quem) return enviar(res, 401, '{"erro":"sessao"}', json);
+      if (req.method === "GET") return enviar(res, 200, JSON.stringify({ provedores: iaStatus() }), json);
+      if (req.method !== "POST" || !String(req.headers["content-type"]).startsWith("application/json")) return enviar(res, 415, '{"erro":"json"}', json);
+      const uso = (iaUsoPorUsuario.get(quem) || []).filter((t) => Date.now() - t < 3600e3);
+      if (uso.length >= IA_LIMITE_HORA) return enviar(res, 429, JSON.stringify({ erro: `Limite de ${IA_LIMITE_HORA} pedidos de IA por hora atingido.` }), json);
+      let pedido;
+      try { pedido = JSON.parse((await lerCorpo(req, 60000)) || "{}"); } catch { return enviar(res, 400, '{"erro":"json invalido"}', json); }
+      if (!pedido.prompt || typeof pedido.prompt !== "string") return enviar(res, 400, '{"erro":"prompt"}', json);
+      if (!PROVEDORES.length) return enviar(res, 503, '{"erro":"Nenhuma IA configurada no servidor."}', json);
+      uso.push(Date.now()); iaUsoPorUsuario.set(quem, uso);
+      try { return enviar(res, 200, JSON.stringify(await iaGerar(pedido.prompt)), json); }
+      catch (e) { return enviar(res, 503, JSON.stringify({ erro: e.message, falhas: e.falhas }), json); }
+    }
+
     if (pathname.startsWith("/instagram/") || pathname.startsWith("/api/instagram")) {
       if (!quem && pathname !== "/instagram/retorno") return pathname.startsWith("/api/") ? enviar(res, 401, '{"erro":"sessao"}', { "content-type": "application/json" }) : ir(res, "/entrar");
       // Ações que mudam algo exigem JSON, para outros sites não conseguirem dispará-las.
@@ -181,7 +197,7 @@ createServer(async (req, res) => {
     console.error(e);
     enviar(res, 500, "Erro interno", { "content-type": "text/plain; charset=utf-8" });
   }
-}).listen(PORTA, () => console.log(`Roteirista 40s na porta ${PORTA}. Acessos: ${[...usuarios.keys()].join(", ")}. Dados em ${DADOS}`));
+}).listen(PORTA, () => console.log(`Roteirista 40s na porta ${PORTA}. Acessos: ${[...usuarios.keys()].join(", ")}. Dados em ${DADOS}. IAs: ${PROVEDORES.map((p) => p.nome).join(", ") || "nenhuma (só motor próprio)"}`));
 
 // ---- Instagram (API oficial da Meta, login pelo Instagram) ----
 // Configure INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET (app em developers.facebook.com).
@@ -334,6 +350,83 @@ async function rotasInstagram(req, res, pathname, quem) {
   return false;
 }
 
+// ---- IA gratuita com revezamento entre provedores ----
+// Cada provedor com chave configurada entra na fila. Os pedidos são distribuídos entre eles
+// (para gastar a cota grátis de todos por igual); o que bater no limite fica em pausa e
+// volta sozinho. Se todos estiverem em pausa, a página usa o motor próprio.
+// Todos falam o formato de chat da OpenAI; o modelo de cada um pode ser trocado no YAML.
+const PROVEDORES = [
+  { id: "gemini", nome: "Google Gemini", chave: process.env.GEMINI_API_KEY, url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", modelo: process.env.GEMINI_MODELO || "gemini-2.5-flash" },
+  { id: "groq", nome: "Groq", chave: process.env.GROQ_API_KEY, url: "https://api.groq.com/openai/v1/chat/completions", modelo: process.env.GROQ_MODELO || "llama-3.3-70b-versatile" },
+  { id: "cerebras", nome: "Cerebras", chave: process.env.CEREBRAS_API_KEY, url: "https://api.cerebras.ai/v1/chat/completions", modelo: process.env.CEREBRAS_MODELO || "llama-3.3-70b" },
+  { id: "openrouter", nome: "OpenRouter", chave: process.env.OPENROUTER_API_KEY, url: "https://openrouter.ai/api/v1/chat/completions", modelo: process.env.OPENROUTER_MODELO || "meta-llama/llama-3.3-70b-instruct:free" },
+  { id: "mistral", nome: "Mistral", chave: process.env.MISTRAL_API_KEY, url: "https://api.mistral.ai/v1/chat/completions", modelo: process.env.MISTRAL_MODELO || "mistral-small-latest" },
+  { id: "github", nome: "GitHub Models", chave: process.env.GITHUB_MODELS_TOKEN, url: "https://models.github.ai/inference/chat/completions", modelo: process.env.GITHUB_MODELO || "openai/gpt-4o-mini" },
+].filter((p) => p.chave);
+const iaPausa = new Map(); // id -> { ate, motivo }
+let iaVez = 0;
+const iaUsoPorUsuario = new Map(); // limite por pessoa, para ninguém esgotar a cota de todos
+const IA_LIMITE_HORA = Number(process.env.IA_LIMITE_HORA) || 40;
+
+function iaExtrairJson(texto) {
+  const t = String(texto).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  try { return JSON.parse(t); } catch {}
+  const ini = [t.indexOf("{"), t.indexOf("[")].filter((i) => i >= 0);
+  const fim = Math.max(t.lastIndexOf("}"), t.lastIndexOf("]"));
+  if (!ini.length || fim <= Math.min(...ini)) throw new Error("a resposta não veio em JSON");
+  return JSON.parse(t.slice(Math.min(...ini), fim + 1));
+}
+// Quanto tempo deixar um provedor descansando, conforme o erro.
+function iaTempoDePausa(status, texto, retryAfter) {
+  const t = String(texto).toLowerCase();
+  if (status === 429) return /day|daily|quota|exceeded|per day|resource_exhausted|credits/.test(t) ? 3600e3 : Math.max(20e3, (Number(retryAfter) || 60) * 1000);
+  if (status === 401 || status === 403 || status === 402) return 6 * 3600e3; // chave inválida ou sem crédito
+  if ((status === 400 || status === 404) && /model/.test(t)) return 6 * 3600e3; // modelo não existe mais
+  return 60e3; // instabilidade passageira
+}
+async function iaChamar(p, prompt) {
+  const r = await fetch(p.url, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${p.chave}`, ...(p.id === "openrouter" && { "X-Title": "Roteirista 40s" }) },
+    body: JSON.stringify({ model: p.modelo, temperature: 0.9, max_tokens: 3500, messages: [
+      { role: "system", content: "Você é o Roteirista 40s. Responda somente com JSON válido, sem nenhum texto antes ou depois." },
+      { role: "user", content: prompt },
+    ] }),
+    signal: AbortSignal.timeout(60000),
+  });
+  const texto = await r.text();
+  if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}: ${texto.slice(0, 160)}`), { pausa: iaTempoDePausa(r.status, texto, r.headers.get("retry-after")) });
+  let conteudo;
+  try { conteudo = JSON.parse(texto).choices?.[0]?.message?.content; } catch {}
+  if (!conteudo) throw Object.assign(new Error("resposta vazia"), { pausa: 30e3 });
+  return iaExtrairJson(conteudo); // JSON ruim: tenta o próximo provedor, sem pausar este
+}
+async function iaGerar(prompt) {
+  const livres = PROVEDORES.filter((p) => !(iaPausa.get(p.id)?.ate > Date.now()));
+  const fila = livres.map((_, i) => livres[(iaVez + i) % livres.length]);
+  iaVez++;
+  const falhas = [];
+  for (const p of fila) {
+    try {
+      const resultado = await iaChamar(p, prompt);
+      iaPausa.delete(p.id);
+      return { resultado, provedor: p.nome };
+    } catch (e) {
+      falhas.push(`${p.nome}: ${e.message}`);
+      if (e.pausa) iaPausa.set(p.id, { ate: Date.now() + e.pausa, motivo: e.message.slice(0, 120) });
+      console.error(`IA ${p.nome} falhou (${e.message.slice(0, 120)}); tentando a próxima.`);
+    }
+  }
+  throw Object.assign(new Error("Todas as IAs estão no limite agora."), { falhas });
+}
+function iaStatus() {
+  return PROVEDORES.map((p) => {
+    const pz = iaPausa.get(p.id);
+    const pausado = pz?.ate > Date.now();
+    return { nome: p.nome, modelo: p.modelo, disponivel: !pausado, ...(pausado && { volta: new Date(pz.ate).toISOString(), motivo: pz.motivo }) };
+  });
+}
+
 // ---- Páginas públicas exigidas pela Meta: privacidade e exclusão de dados ----
 // Ficam abertas (sem login) porque o revisor da Meta e qualquer usuário precisam acessá-las.
 // RESPONSAVEL e CONTATO_EMAIL (opcionais, no YAML) aparecem nas duas páginas.
@@ -375,6 +468,8 @@ function paginaPrivacidade() {
 </ul>
 <h2>Como usamos</h2>
 <p>Usamos esses dados apenas para mostrar a você a análise dos seus Reels e para melhorar as sugestões de roteiros feitas para você. O acesso ao Instagram é somente leitura: o Roteirista nunca publica, comenta ou envia mensagens.</p>
+<h2>Inteligência artificial</h2>
+<p>Quando a escrita por IA está ativada, as informações que você digita para criar um roteiro (nicho, detalhes, público, tom e duração) são enviadas a provedores de IA (como Google Gemini, Groq, Cerebras, OpenRouter, Mistral ou GitHub Models) apenas para gerar o texto. Dados e métricas do Instagram não são enviados a esses provedores.</p>
 <h2>Compartilhamento</h2>
 <p>Não vendemos nem compartilhamos seus dados com terceiros, nem os usamos para publicidade. Os dados ficam armazenados no nosso servidor, hospedado pela Hostinger International Ltd., que atua apenas como provedor de hospedagem.</p>
 <h2>Armazenamento e segurança</h2>

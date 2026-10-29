@@ -28,6 +28,14 @@ services:
       # Aparecem na Política de Privacidade e na página de Exclusão de dados (exigidas pela Meta)
       RESPONSAVEL: ""
       CONTATO_EMAIL: ""
+      # IAs gratuitas em revezamento (preencha as que tiver; vazias são ignoradas).
+      # Quando uma bate no limite, passa para a próxima; se todas estiverem no limite, usa o motor próprio.
+      GEMINI_API_KEY: ""        # aistudio.google.com/apikey
+      GROQ_API_KEY: ""          # console.groq.com/keys
+      CEREBRAS_API_KEY: ""      # cloud.cerebras.ai
+      OPENROUTER_API_KEY: ""    # openrouter.ai/keys
+      MISTRAL_API_KEY: ""       # console.mistral.ai/api-keys
+      GITHUB_MODELS_TOKEN: ""   # github.com/settings/tokens (permissão "Models")
     user: node
     volumes:
       - roteirista_dados:/home/node   # histórico e resultados de cada usuário: sobrevivem a reinícios e reimplantações
