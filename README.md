@@ -57,6 +57,11 @@ Para ativar (uma vez, pelo administrador):
 3. Em **Configurar login comercial do Instagram**, adicione a URI de redirecionamento: `https://roteiros.murinoi.com/instagram/retorno` (troque pelo seu domínio).
 4. Enquanto o app não passa pela revisão da Meta, só conectam as contas adicionadas em **Funções do app > Testadores do Instagram**. A pessoa aceita o convite no Instagram em **Configurações > Apps e sites > Convites de testador**.
 5. No YAML, em `environment`, adicione `INSTAGRAM_APP_ID` e `INSTAGRAM_APP_SECRET` e implante de novo.
+6. Em **Configurações do app > Básico**, preencha:
+   - **URL da Política de Privacidade:** `https://roteiros.murinoi.com/privacidade`
+   - **URL de exclusão de dados do usuário:** `https://roteiros.murinoi.com/exclusao-de-dados` (como instruções) ou, como callback, o mesmo endereço: a Meta envia o `signed_request`, o Roteirista apaga os dados e devolve o código de confirmação.
+7. Em **Configurar login comercial do Instagram**, use `https://roteiros.murinoi.com/instagram/desautorizar` como **URL de retorno de chamada de desautorização** e `https://roteiros.murinoi.com/exclusao-de-dados` como **URL de solicitação de exclusão de dados**.
+8. Opcional: no YAML, `RESPONSAVEL` (seu nome ou empresa) e `CONTATO_EMAIL` aparecem nas duas páginas.
 
 ## Atualizar
 

@@ -2,7 +2,7 @@
 // Acessos na variável USUARIOS="usuario:senha,outro:senha2".
 // As senhas viram hash scrypt na memória ao ligar; a sessão é um cookie assinado (7 dias).
 import { createServer } from "node:http";
-import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync, unlinkSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from "node:crypto";
@@ -125,6 +125,13 @@ createServer(async (req, res) => {
     const quem = lerSessao(req);
 
     if (pathname === "/saude") return enviar(res, 200, "ok\n", { "content-type": "text/plain" });
+    const html = { "content-type": "text/html; charset=utf-8" };
+    if (pathname === "/privacidade") return enviar(res, 200, paginaPrivacidade(), html);
+    if (pathname === "/exclusao-de-dados") {
+      if (req.method === "POST") return rotaExclusaoMeta(req, res, "exclusão");
+      return enviar(res, 200, paginaExclusao(new URL(req.url, "http://x").searchParams.get("codigo")), html);
+    }
+    if (pathname === "/instagram/desautorizar" && req.method === "POST") return rotaExclusaoMeta(req, res, "desautorização");
 
     if (pathname === "/entrar" && req.method === "POST") {
       const ip = ipDe(req);
@@ -230,7 +237,7 @@ async function igConectar(nome, code, req) {
   const curto = await igPedir("https://api.instagram.com/oauth/access_token", { method: "POST", body: corpo });
   const longo = await igPedir(`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${encodeURIComponent(IG_SEGREDO)}&access_token=${encodeURIComponent(curto.access_token)}`);
   const perfil = await igPedir(`${IG_GRAPH}/me?fields=user_id,username,followers_count&access_token=${encodeURIComponent(longo.access_token)}`);
-  gravarJson(arquivoDe(nome, ".ig"), { token: longo.access_token, expira: Date.now() + (longo.expires_in || 5184000) * 1000, renovado: Date.now(), usuario: perfil.username, seguidores: perfil.followers_count ?? null });
+  gravarJson(arquivoDe(nome, ".ig"), { token: longo.access_token, expira: Date.now() + (longo.expires_in || 5184000) * 1000, renovado: Date.now(), usuario: perfil.username, seguidores: perfil.followers_count ?? null, ids: [String(perfil.user_id ?? ""), String(curto.user_id ?? "")].filter(Boolean) });
 }
 
 // Busca os últimos Reels com as métricas que o algoritmo mais pesa.
@@ -325,6 +332,113 @@ async function rotasInstagram(req, res, pathname, quem) {
     return enviar(res, 200, '{"ok":true}', json);
   }
   return false;
+}
+
+// ---- Páginas públicas exigidas pela Meta: privacidade e exclusão de dados ----
+// Ficam abertas (sem login) porque o revisor da Meta e qualquer usuário precisam acessá-las.
+// RESPONSAVEL e CONTATO_EMAIL (opcionais, no YAML) aparecem nas duas páginas.
+const RESPONSAVEL = process.env.RESPONSAVEL || "o responsável pelo Roteirista 40s";
+const CONTATO = process.env.CONTATO_EMAIL || "";
+const contatoHtml = () => (CONTATO ? `<a href="mailto:${esc(CONTATO)}">${esc(CONTATO)}</a>` : "o contato informado por quem te deu acesso ao Roteirista");
+
+function paginaPublica(titulo, corpo) {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(titulo)} · Roteirista 40s</title>
+<style>
+  :root { --bg: #f2f2f6; --surface: #fff; --fg: #16141f; --muted: #646178; --line: #dcdbe6; --accent: #e0305f; --ok: #138a4c; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #121119; --surface: #1b1a25; --fg: #f1f0f6; --muted: #a29fb5; --line: #2f2d3c; --accent: #ff5a85; --ok: #45d08a; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.65 "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 36px max(20px, env(safe-area-inset-left, 0px)) 60px; }
+  .marca { font: 700 13px ui-monospace, Menlo, monospace; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.1; letter-spacing: -0.02em; margin: 8px 0 6px; }
+  h2 { font-size: 20px; margin: 30px 0 8px; }
+  .atual { color: var(--muted); font-size: 14px; }
+  .caixa { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 18px 0; }
+  .ok { border-color: var(--ok); }
+  a { color: var(--accent); }
+  li { margin: 6px 0; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+</style></head><body><main><div class="marca">Roteirista 40s</div>${corpo}</main></body></html>`;
+}
+
+function paginaPrivacidade() {
+  return paginaPublica("Política de Privacidade", `
+<h1>Política de Privacidade</h1>
+<p class="atual">Última atualização: 29 de outubro de 2026</p>
+<p>O Roteirista 40s é uma ferramenta que cria roteiros de Reels e, se você quiser, analisa o desempenho dos seus Reels no Instagram. Esta política explica quais dados usamos e como. O controlador dos dados é ${esc(RESPONSAVEL)}.</p>
+<h2>Dados que coletamos</h2>
+<ul>
+  <li><b>Acesso ao Roteirista:</b> seu nome de usuário de acesso. A senha nunca é guardada em texto; ela é transformada em código (hash) na memória do servidor.</li>
+  <li><b>Seus roteiros:</b> os roteiros que você cria, os campos que preenche (nicho, público, tom) e os números que você registra manualmente.</li>
+  <li><b>Instagram (somente se você conectar):</b> seu nome de usuário, número de seguidores, a lista dos seus Reels (legenda, data, link e miniatura) e as métricas desses Reels (visualizações, alcance, curtidas, comentários, salvamentos, compartilhamentos, tempo médio assistido e taxa de pulos), além do token de acesso concedido por você.</li>
+</ul>
+<h2>Como usamos</h2>
+<p>Usamos esses dados apenas para mostrar a você a análise dos seus Reels e para melhorar as sugestões de roteiros feitas para você. O acesso ao Instagram é somente leitura: o Roteirista nunca publica, comenta ou envia mensagens.</p>
+<h2>Compartilhamento</h2>
+<p>Não vendemos nem compartilhamos seus dados com terceiros, nem os usamos para publicidade. Os dados ficam armazenados no nosso servidor, hospedado pela Hostinger International Ltd., que atua apenas como provedor de hospedagem.</p>
+<h2>Armazenamento e segurança</h2>
+<p>Os dados ficam em um servidor protegido, acessível por conexão segura (HTTPS). O token do Instagram fica somente no servidor e nunca é enviado ao navegador. Cada usuário só acessa os próprios dados.</p>
+<h2>Por quanto tempo guardamos</h2>
+<p>Enquanto sua conta de acesso existir ou até você pedir a exclusão. Ao desconectar o Instagram, o token e os dados do Instagram são apagados na hora.</p>
+<h2>Seus direitos (LGPD)</h2>
+<p>Você pode pedir acesso, correção ou exclusão dos seus dados a qualquer momento. Veja como em <a href="/exclusao-de-dados">Exclusão de dados</a>.</p>
+<h2>Contato</h2>
+<p>Fale com ${esc(RESPONSAVEL)} por ${contatoHtml()}.</p>`);
+}
+
+const ARQ_EXCLUSOES = join(DADOS, "exclusoes.json");
+function paginaExclusao(codigo) {
+  const reg = codigo ? (lerJson(ARQ_EXCLUSOES) || {})[codigo] : null;
+  const status = codigo ? (reg
+    ? `<div class="caixa ok"><b>Pedido de exclusão concluído.</b><br>Código <code>${esc(codigo)}</code>, recebido em ${esc(new Date(reg.data).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }))}. ${reg.apagados ? "Os dados do Instagram ligados a esta conta foram apagados." : "Não havia dados do Instagram guardados para esta conta."}</div>`
+    : `<div class="caixa">Não encontramos o código <code>${esc(codigo)}</code>. Confira se ele foi copiado inteiro.</div>`) : "";
+  return paginaPublica("Exclusão de dados", `
+<h1>Exclusão de dados</h1>
+${status}
+<p>Você pode apagar os dados que o Roteirista 40s guarda sobre você de três formas:</p>
+<h2>1. Dentro do Roteirista (na hora)</h2>
+<p>Entre no Roteirista, vá até o painel <b>O que o seu público mostrou</b> e clique em <b>Desconectar</b>. O token e todos os dados do Instagram são apagados imediatamente.</p>
+<h2>2. Pelo Instagram</h2>
+<p>No Instagram, abra <b>Configurações &gt; Apps e sites</b>, encontre o Roteirista e toque em <b>Remover</b>. O Instagram nos avisa automaticamente e apagamos os seus dados do Instagram. Você recebe um código de confirmação e pode consultar o status nesta página.</p>
+<h2>3. Pedido completo</h2>
+<p>Para apagar também sua conta de acesso e todos os roteiros e resultados salvos, envie um pedido para ${contatoHtml()} informando seu usuário. Atendemos em até 15 dias, conforme a LGPD.</p>
+<p class="atual">Veja também a <a href="/privacidade">Política de Privacidade</a>.</p>`);
+}
+
+// Formato "signed_request" da Meta: assinatura HMAC-SHA256 com a chave secreta do app.
+function lerSignedRequest(sr) {
+  const [ass, carga] = String(sr || "").split(".");
+  if (!ass || !carga || !IG_SEGREDO) return null;
+  const esperado = createHmac("sha256", IG_SEGREDO).update(carga).digest("base64url");
+  if (esperado.length !== ass.length || !timingSafeEqual(Buffer.from(esperado), Buffer.from(ass))) return null;
+  try { return JSON.parse(Buffer.from(carga, "base64url").toString()); } catch { return null; }
+}
+// Apaga o token e os Reels de quem tiver esse ID do Instagram.
+function apagarPorIdInstagram(idIg) {
+  let apagados = 0;
+  for (const arq of readdirSync(DADOS).filter((f) => f.endsWith(".ig.json"))) {
+    const conta = lerJson(join(DADOS, arq));
+    if (!conta?.ids?.includes(String(idIg))) continue;
+    for (const f of [arq, arq.replace(".ig.json", ".reels.json")]) try { unlinkSync(join(DADOS, f)); } catch {}
+    apagados++;
+  }
+  return apagados;
+}
+async function rotaExclusaoMeta(req, res, tipo) {
+  const corpo = await lerCorpo(req, 20000);
+  const dados = lerSignedRequest(new URLSearchParams(corpo || "").get("signed_request"));
+  const json = { "content-type": "application/json; charset=utf-8" };
+  if (!dados?.user_id) return enviar(res, 400, '{"erro":"signed_request invalido"}', json);
+  const apagados = apagarPorIdInstagram(dados.user_id);
+  console.log(`Meta pediu ${tipo} do Instagram ${dados.user_id}: ${apagados} conta(s) apagada(s).`);
+  if (tipo === "desautorização") return enviar(res, 200, '{"ok":true}', json);
+  const codigo = randomBytes(6).toString("hex");
+  const registro = lerJson(ARQ_EXCLUSOES) || {};
+  registro[codigo] = { data: new Date().toISOString(), apagados };
+  gravarJson(ARQ_EXCLUSOES, registro);
+  const base = `https://${req.headers["x-forwarded-host"] || req.headers.host}`;
+  return enviar(res, 200, JSON.stringify({ url: `${base}/exclusao-de-dados?codigo=${codigo}`, confirmation_code: codigo }), json);
 }
 
 // ---- Atualização automática ----

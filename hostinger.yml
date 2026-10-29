@@ -25,6 +25,9 @@ services:
       # Conexão com o Instagram (opcional): veja "Conectar com o Instagram" no README
       INSTAGRAM_APP_ID: ""
       INSTAGRAM_APP_SECRET: ""
+      # Aparecem na Política de Privacidade e na página de Exclusão de dados (exigidas pela Meta)
+      RESPONSAVEL: ""
+      CONTATO_EMAIL: ""
     user: node
     volumes:
       - roteirista_dados:/home/node   # histórico e resultados de cada usuário: sobrevivem a reinícios e reimplantações
