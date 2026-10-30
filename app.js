@@ -375,6 +375,7 @@ const iaPausa = new Map(); // id -> { ate, motivo }
 let iaVez = 0;
 const iaUsoPorUsuario = new Map(); // limite por pessoa, para ninguém esgotar a cota de todos
 const IA_LIMITE_HORA = Number(process.env.IA_LIMITE_HORA) || 40;
+const IA_ESPERA = (Number(process.env.IA_ESPERA_SEGUNDOS) || 15) * 1000;
 
 function iaExtrairJson(texto) {
   const t = String(texto).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -432,7 +433,7 @@ function iaLimpar(texto) {
   // Modelos que "pensam em voz alta" mandam o raciocínio junto; só interessa a resposta.
   return String(texto).replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
-async function iaChamar(p, prompt) {
+async function iaChamar(p, prompt, cancelar) {
   if (!p.modelo) p.modelo = await iaEscolherModelo(p);
   const corpo = {
     model: p.modelo, temperature: 0.95, max_tokens: p.maxTokens || 4000,
@@ -448,7 +449,7 @@ async function iaChamar(p, prompt) {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${p.chave}`, ...(p.id === "openrouter" && { "X-Title": "AI Prompter" }) },
     body: JSON.stringify(corpo),
-    signal: AbortSignal.timeout(75000),
+    signal: AbortSignal.any([AbortSignal.timeout(60000), cancelar].filter(Boolean)),
   });
   const texto = await r.text();
   if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}: ${texto.slice(0, 200)}`), { diag: iaDiagnostico(r.status, texto, r.headers.get("retry-after")) });
@@ -461,11 +462,13 @@ async function iaChamar(p, prompt) {
 }
 // Uma tentativa num provedor, corrigindo sozinho o que dá para corrigir na hora
 // (modelo aposentado, modo JSON não aceito, pedido grande demais) antes de desistir dele.
-async function iaTentar(p, prompt) {
+async function iaTentar(p, prompt, cancelar) {
   for (let ajustes = 0; ; ajustes++) {
-    try { return await iaChamar(p, prompt); }
+    try { return await iaChamar(p, prompt, cancelar); }
     catch (e) {
-      const d = e.diag || { motivo: e.name === "TimeoutError" ? "demorou demais" : "sem conexão", pausa: 45e3 };
+      if (cancelar?.aborted) throw Object.assign(e, { diag: { motivo: "outra IA respondeu antes", pausa: 0 } });
+      // Travou até o tempo limite: fica 10 min de fora para não segurar ninguém.
+      const d = e.diag || (e.name === "TimeoutError" ? { motivo: "demorou demais", pausa: 600e3 } : { motivo: "sem conexão", pausa: 45e3 });
       if (ajustes < 2 && d.semJson && !p.semJson) { p.semJson = true; continue; }
       if (ajustes < 2 && d.menosTokens && (p.maxTokens || 4000) > 2500) { p.maxTokens = 2500; continue; }
       if (ajustes < 2 && d.trocarModelo && !p.fixo) {
@@ -490,17 +493,36 @@ async function iaGerar(prompt) {
   const fila = livres.map((_, i) => livres[(iaVez + i) % livres.length]);
   iaVez++;
   const falhas = [];
-  for (const p of fila) {
-    try {
-      const resultado = await iaTentar(p, prompt);
-      iaPausa.delete(p.id);
-      return { resultado, provedor: p.nome };
-    } catch (e) {
-      falhas.push(`${p.nome}: ${e.diag.motivo}`);
-      if (e.diag.pausa) iaPausa.set(p.id, { ate: Date.now() + e.diag.pausa, motivo: e.diag.motivo });
-      console.error(`IA ${p.nome} (${p.modelo}) falhou: ${e.message.slice(0, 200)}. Passando para a próxima.`);
-    }
-  }
+  // Corrida escalonada: começa pela da vez; se ela falhar, a próxima entra na hora; se só
+  // estiver lenta (mais de IA_ESPERA s), a próxima entra em paralelo. Vale a primeira resposta boa.
+  const cancelar = new AbortController();
+  const resposta = await new Promise((resolver) => {
+    let proxima = 0, rodando = 0, timer;
+    const lancar = () => {
+      clearTimeout(timer);
+      if (cancelar.signal.aborted) return;
+      if (proxima >= fila.length) { if (!rodando) resolver(null); return; }
+      const p = fila[proxima++];
+      rodando++;
+      timer = setTimeout(lancar, IA_ESPERA);
+      iaTentar(p, prompt, cancelar.signal).then((resultado) => {
+        rodando--;
+        if (cancelar.signal.aborted) return;
+        iaPausa.delete(p.id);
+        cancelar.abort(); clearTimeout(timer);
+        resolver({ resultado, provedor: p.nome });
+      }, (e) => {
+        rodando--;
+        if (cancelar.signal.aborted) return;
+        falhas.push(`${p.nome}: ${e.diag.motivo}`);
+        if (e.diag.pausa) iaPausa.set(p.id, { ate: Date.now() + e.diag.pausa, motivo: e.diag.motivo });
+        console.error(`IA ${p.nome} (${p.modelo}) falhou: ${e.message.slice(0, 200)}. Passando para a próxima.`);
+        lancar();
+      });
+    };
+    lancar();
+  });
+  if (resposta) return resposta;
   for (const p of PROVEDORES) if (!fila.includes(p)) {
     const pz = iaPausa.get(p.id);
     falhas.push(`${p.nome}: ${pz.motivo}, volta às ${new Date(pz.ate).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: process.env.TZ || "America/Sao_Paulo" })}`);
