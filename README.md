@@ -84,11 +84,16 @@ O servidor pode escrever os roteiros com várias IAs gratuitas, uma de reserva p
 - Para fixar um modelo: `GEMINI_MODELO`, `GROQ_MODELO`, `CEREBRAS_MODELO`, `OPENROUTER_MODELO`, `MISTRAL_MODELO` ou `GITHUB_MODELO`.
 - Dados do Instagram nunca são enviados a essas IAs.
 
-## Atualizar
+## Atualizar e ficar sempre no ar
 
-**Automático.** A cada 5 minutos o servidor confere o GitHub:
-- página e tela de login novas entram na hora, sem reiniciar e sem deslogar ninguém;
-- um servidor novo só é instalado se passar na checagem de erros, e aí o container reinicia sozinho (as sessões continuam, o segredo fica salvo junto dos dados).
+**Automático e sem queda.** O `servidor.js` é um supervisor pequeno que segura a porta e roda o aplicativo (`app.js`) num processo filho:
+- a cada 5 minutos confere o GitHub; se houver versão nova (app, página ou tela de login), liga o app novo, espera ele atender e só então desliga o antigo: ninguém vê o site cair nem é deslogado;
+- se a versão nova não ligar, a anterior continua atendendo;
+- se o app cair por qualquer motivo, o supervisor liga outro em menos de 1 segundo;
+- erros inesperados viram linha no log em vez de derrubar o site;
+- ao ligar o container, se o GitHub estiver fora do ar, usa a cópia salva no volume.
+
+O container só reinicia nos raros casos em que o próprio supervisor muda.
 
 Variáveis opcionais: `ATUALIZACAO=0` desliga, `ATUALIZACAO_MINUTOS=10` muda o intervalo.
 
@@ -99,7 +104,8 @@ Variáveis opcionais: `ATUALIZACAO=0` desliga, `ATUALIZACAO_MINUTOS=10` muda o i
 ## Arquivos
 
 ```
-servidor.js          servidor com tela de login (Node, sem dependências)
+servidor.js          supervisor: atualiza e religa o app sem derrubar o site
+app.js               o aplicativo: tela de login, páginas e APIs (Node, sem dependências)
 public/index.html    o AI Prompter (interface, motor de roteiros e teleprompter)
 public/login.html    a tela de login
 hostinger.yml        instalação na Hostinger, sem build

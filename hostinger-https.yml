@@ -13,7 +13,7 @@ services:
     ports:
       - "8081:3000"
     mem_limit: 128m
-    cpus: 0.25
+    cpus: 0.5
     labels:
       - traefik.enable=true
       - traefik.http.routers.roteirista.rule=Host(`roteiros.seudominio.com`)
@@ -46,18 +46,19 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        set -e
         RAW=https://raw.githubusercontent.com/wyterlin1-svg/Roteiro-Assistente-/refs/heads/claude/roteirista-40s
         mkdir -p /home/node/app/public && cd /home/node/app
-        wget -qO servidor.js "$$RAW/servidor.js"
-        wget -qO public/index.html "$$RAW/public/index.html"
-        wget -qO public/login.html "$$RAW/public/login.html"
+        # Baixa a versão mais nova; se o GitHub estiver fora do ar, liga com a cópia salva no volume.
+        for f in servidor.js app.js public/index.html public/login.html; do
+          wget -qO "$$f.baixando" "$$RAW/$$f" && mv "$$f.baixando" "$$f" || echo "GitHub indisponível: usando a cópia salva de $$f"
+        done
         exec node servidor.js
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/saude"]
       interval: 30s
-      timeout: 3s
+      timeout: 5s
       retries: 3
+      start_period: 20s
 
 volumes:
   roteirista_dados:
