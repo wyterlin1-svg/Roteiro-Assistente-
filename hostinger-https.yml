@@ -1,4 +1,4 @@
-# Roteirista 40s na Hostinger com subdomínio e HTTPS, no mesmo padrão do n8n
+# AI Prompter na Hostinger com subdomínio e HTTPS, no mesmo padrão do n8n
 # (Traefik da Hostinger: entrypoint "websecure" e certresolver "letsencrypt").
 #
 # Antes de implantar, troque:

@@ -1,4 +1,4 @@
-// Roteirista 40s: servidor com tela de login, sem dependências.
+// AI Prompter: servidor com tela de login, sem dependências.
 // Acessos na variável USUARIOS="usuario:senha,outro:senha2".
 // As senhas viram hash scrypt na memória ao ligar; a sessão é um cookie assinado (7 dias).
 import { createServer } from "node:http";
@@ -82,8 +82,8 @@ function errou(ip) {
 let LOGIN = readFileSync(join(PASTA, "login.html"), "utf8");
 let APP = readFileSync(join(PASTA, "index.html"), "utf8");
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-// Botão de sair, colocado sobre a página do Roteirista só quando servida por aqui.
-const comSair = (nome) => APP.replace("</body>", `<a href="/sair" id="sair-sessao" style="position:fixed;z-index:10;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));font:600 13px var(--f-body,system-ui);color:var(--fg,#16141f);background:var(--surface,#fff);border:1px solid var(--line,#dcdbe6);border-radius:99px;padding:8px 14px;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.08)">${esc(nome)} · Sair</a>\n</body>`);
+// Botão de sair, colocado sobre a página do AI Prompter só quando servida por aqui.
+const comSair = (nome) => APP.replace("</body>", `<a href="/sair" id="sair-sessao" style="position:fixed;z-index:10;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));font:600 13px var(--f-body,system-ui);color:var(--fg,#e8ebf3);background:var(--surface,#10121b);border:1px solid var(--line,#272a36);border-radius:99px;padding:8px 14px;text-decoration:none;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 24px -10px rgba(0,0,0,.8)">${esc(nome)} · Sair</a>\n</body>`);
 
 const SEGURANCA = { "x-content-type-options": "nosniff", "x-frame-options": "SAMEORIGIN", "referrer-policy": "same-origin", "cache-control": "no-store" };
 function enviar(res, status, corpo, extra = {}) {
@@ -197,7 +197,7 @@ createServer(async (req, res) => {
     console.error(e);
     enviar(res, 500, "Erro interno", { "content-type": "text/plain; charset=utf-8" });
   }
-}).listen(PORTA, () => console.log(`Roteirista 40s na porta ${PORTA}. Acessos: ${[...usuarios.keys()].join(", ")}. Dados em ${DADOS}. IAs: ${PROVEDORES.map((p) => p.nome).join(", ") || "nenhuma (só motor próprio)"}`));
+}).listen(PORTA, () => console.log(`AI Prompter na porta ${PORTA}. Acessos: ${[...usuarios.keys()].join(", ")}. Dados em ${DADOS}. IAs: ${PROVEDORES.map((p) => p.nome).join(", ") || "nenhuma (só motor próprio)"}`));
 
 // ---- Instagram (API oficial da Meta, login pelo Instagram) ----
 // Configure INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET (app em developers.facebook.com).
@@ -228,7 +228,7 @@ async function igPedir(url, opcoes) {
 const igState = (nome) => { const c = `${Buffer.from(nome).toString("base64url")}.${Date.now() + 600000}`; return `${c}.${assinar(c)}`; };
 // Devolve o usuário dono do "state" (assinado pelo servidor), ou null se adulterado ou vencido.
 // Assim a volta do Instagram funciona mesmo quando o login acontece no app do Instagram
-// e a página volta num navegador sem a sessão do Roteirista.
+// e a página volta num navegador sem a sessão do AI Prompter.
 function igDonoDoState(state) {
   const [n, exp, ass] = String(state).split(".");
   if (!ass || assinar(`${n}.${exp}`) !== ass || Number(exp) < Date.now()) return null;
@@ -240,7 +240,7 @@ function igDonoDoState(state) {
 const igFalhas = new Map();
 function igMotivo(msg = "") {
   const m = msg.toLowerCase();
-  if (m.includes("redirect")) return "O endereço de retorno não confere. No app da Meta, em Configurar login comercial do Instagram, a URI de redirecionamento precisa ser exatamente o endereço de retorno mostrado no painel do Roteirista.";
+  if (m.includes("redirect")) return "O endereço de retorno não confere. No app da Meta, em Configurar login comercial do Instagram, a URI de redirecionamento precisa ser exatamente o endereço de retorno mostrado no painel do AI Prompter.";
   if (m.includes("developer role") || m.includes("tester") || m.includes("permission")) return "Esta conta do Instagram ainda não tem acesso ao app. Adicione-a em Funções do app > Testadores do Instagram e aceite o convite no Instagram (Configurações > Apps e sites > Convites de testador).";
   if (m.includes("platform app") || m.includes("client_id") || m.includes("app id") || m.includes("client secret") || m.includes("secret")) return "ID ou chave secreta do app não conferem. Use o ID do app do *Instagram* e a chave secreta do *Instagram* (em API do Instagram > Configurar com login do Instagram), não os do Facebook.";
   if (m.includes("code") && (m.includes("used") || m.includes("expired") || m.includes("invalid"))) return "O código do Instagram expirou ou já foi usado. Clique em Conectar Instagram de novo.";
@@ -435,7 +435,7 @@ async function iaChamar(p, prompt) {
   const corpo = {
     model: p.modelo, temperature: 0.95, max_tokens: p.maxTokens || 4000,
     messages: [
-      { role: "system", content: "Você é o Roteirista 40s, roteirista de Reels criativo e fora da caixa. Responda somente com JSON válido, sem nenhum texto antes ou depois." },
+      { role: "system", content: "Você é o AI Prompter, roteirista de Reels criativo e fora da caixa. Responda somente com JSON válido, sem nenhum texto antes ou depois." },
       { role: "user", content: prompt },
     ],
     ...(!p.semJson && { response_format: { type: "json_object" } }),
@@ -444,7 +444,7 @@ async function iaChamar(p, prompt) {
   };
   const r = await fetch(`${p.base}/chat/completions`, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${p.chave}`, ...(p.id === "openrouter" && { "X-Title": "Roteirista 40s" }) },
+    headers: { "content-type": "application/json", authorization: `Bearer ${p.chave}`, ...(p.id === "openrouter" && { "X-Title": "AI Prompter" }) },
     body: JSON.stringify(corpo),
     signal: AbortSignal.timeout(75000),
   });
@@ -517,18 +517,18 @@ iaPreparar();
 // ---- Páginas públicas exigidas pela Meta: privacidade e exclusão de dados ----
 // Ficam abertas (sem login) porque o revisor da Meta e qualquer usuário precisam acessá-las.
 // RESPONSAVEL e CONTATO_EMAIL (opcionais, no YAML) aparecem nas duas páginas.
-const RESPONSAVEL = process.env.RESPONSAVEL || "o responsável pelo Roteirista 40s";
+const RESPONSAVEL = process.env.RESPONSAVEL || "o responsável pelo AI Prompter";
 const CONTATO = process.env.CONTATO_EMAIL || "";
-const contatoHtml = () => (CONTATO ? `<a href="mailto:${esc(CONTATO)}">${esc(CONTATO)}</a>` : "o contato informado por quem te deu acesso ao Roteirista");
+const contatoHtml = () => (CONTATO ? `<a href="mailto:${esc(CONTATO)}">${esc(CONTATO)}</a>` : "o contato informado por quem te deu acesso ao AI Prompter");
 
 function paginaPublica(titulo, corpo) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(titulo)} · Roteirista 40s</title>
+<title>${esc(titulo)} · AI Prompter</title>
 <style>
-  :root { --bg: #f2f2f6; --surface: #fff; --fg: #16141f; --muted: #646178; --line: #dcdbe6; --accent: #e0305f; --ok: #138a4c; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #121119; --surface: #1b1a25; --fg: #f1f0f6; --muted: #a29fb5; --line: #2f2d3c; --accent: #ff5a85; --ok: #45d08a; color-scheme: dark; } }
+  :root { --bg: #05060a; --surface: #0f1119; --fg: #e8ebf3; --muted: #8b91a4; --line: rgba(255,255,255,.09); --accent: #5ee7ff; --ok: #3ee08f; color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.65 "Helvetica Neue", Arial, sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background-image: radial-gradient(640px 420px at 10% -10%, rgba(94,231,255,.12), transparent 70%); background-attachment: fixed; }
   main { max-width: 760px; margin: 0 auto; padding: 36px max(20px, env(safe-area-inset-left, 0px)) 60px; }
   .marca { font: 700 13px ui-monospace, Menlo, monospace; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; }
   h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.1; letter-spacing: -0.02em; margin: 8px 0 6px; }
@@ -539,22 +539,22 @@ function paginaPublica(titulo, corpo) {
   a { color: var(--accent); }
   li { margin: 6px 0; }
   code { font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
-</style></head><body><main><div class="marca">Roteirista 40s</div>${corpo}</main></body></html>`;
+</style></head><body><main><div class="marca">AI Prompter</div>${corpo}</main></body></html>`;
 }
 
 function paginaPrivacidade() {
   return paginaPublica("Política de Privacidade", `
 <h1>Política de Privacidade</h1>
 <p class="atual">Última atualização: 29 de outubro de 2026</p>
-<p>O Roteirista 40s é uma ferramenta que cria roteiros de Reels e, se você quiser, analisa o desempenho dos seus Reels no Instagram. Esta política explica quais dados usamos e como. O controlador dos dados é ${esc(RESPONSAVEL)}.</p>
+<p>O AI Prompter é uma ferramenta que cria roteiros de Reels e, se você quiser, analisa o desempenho dos seus Reels no Instagram. Esta política explica quais dados usamos e como. O controlador dos dados é ${esc(RESPONSAVEL)}.</p>
 <h2>Dados que coletamos</h2>
 <ul>
-  <li><b>Acesso ao Roteirista:</b> seu nome de usuário de acesso. A senha nunca é guardada em texto; ela é transformada em código (hash) na memória do servidor.</li>
+  <li><b>Acesso ao AI Prompter:</b> seu nome de usuário de acesso. A senha nunca é guardada em texto; ela é transformada em código (hash) na memória do servidor.</li>
   <li><b>Seus roteiros:</b> os roteiros que você cria, os campos que preenche (nicho, público, tom) e os números que você registra manualmente.</li>
   <li><b>Instagram (somente se você conectar):</b> seu nome de usuário, número de seguidores, a lista dos seus Reels (legenda, data, link e miniatura) e as métricas desses Reels (visualizações, alcance, curtidas, comentários, salvamentos, compartilhamentos, tempo médio assistido e taxa de pulos), além do token de acesso concedido por você.</li>
 </ul>
 <h2>Como usamos</h2>
-<p>Usamos esses dados apenas para mostrar a você a análise dos seus Reels e para melhorar as sugestões de roteiros feitas para você. O acesso ao Instagram é somente leitura: o Roteirista nunca publica, comenta ou envia mensagens.</p>
+<p>Usamos esses dados apenas para mostrar a você a análise dos seus Reels e para melhorar as sugestões de roteiros feitas para você. O acesso ao Instagram é somente leitura: o AI Prompter nunca publica, comenta ou envia mensagens.</p>
 <h2>Inteligência artificial</h2>
 <p>Quando a escrita por IA está ativada, as informações que você digita para criar um roteiro (nicho, detalhes, público, tom e duração) são enviadas a provedores de IA (como Google Gemini, Groq, Cerebras, OpenRouter, Mistral ou GitHub Models) apenas para gerar o texto. Dados e métricas do Instagram não são enviados a esses provedores.</p>
 <h2>Compartilhamento</h2>
@@ -578,11 +578,11 @@ function paginaExclusao(codigo) {
   return paginaPublica("Exclusão de dados", `
 <h1>Exclusão de dados</h1>
 ${status}
-<p>Você pode apagar os dados que o Roteirista 40s guarda sobre você de três formas:</p>
-<h2>1. Dentro do Roteirista (na hora)</h2>
-<p>Entre no Roteirista, vá até o painel <b>O que o seu público mostrou</b> e clique em <b>Desconectar</b>. O token e todos os dados do Instagram são apagados imediatamente.</p>
+<p>Você pode apagar os dados que o AI Prompter guarda sobre você de três formas:</p>
+<h2>1. Dentro do AI Prompter (na hora)</h2>
+<p>Entre no AI Prompter, vá até o painel <b>O que o seu público mostrou</b> e clique em <b>Desconectar</b>. O token e todos os dados do Instagram são apagados imediatamente.</p>
 <h2>2. Pelo Instagram</h2>
-<p>No Instagram, abra <b>Configurações &gt; Apps e sites</b>, encontre o Roteirista e toque em <b>Remover</b>. O Instagram nos avisa automaticamente e apagamos os seus dados do Instagram. Você recebe um código de confirmação e pode consultar o status nesta página.</p>
+<p>No Instagram, abra <b>Configurações &gt; Apps e sites</b>, encontre o AI Prompter e toque em <b>Remover</b>. O Instagram nos avisa automaticamente e apagamos os seus dados do Instagram. Você recebe um código de confirmação e pode consultar o status nesta página.</p>
 <h2>3. Pedido completo</h2>
 <p>Para apagar também sua conta de acesso e todos os roteiros e resultados salvos, envie um pedido para ${contatoHtml()} informando seu usuário. Atendemos em até 15 dias, conforme a LGPD.</p>
 <p class="atual">Veja também a <a href="/privacidade">Política de Privacidade</a>.</p>`);
@@ -644,8 +644,8 @@ async function atualizar() {
   try {
     const [pagina, login, servidor] = await Promise.all(["public/index.html", "public/login.html", "servidor.js"].map(buscar));
     // Só aceita arquivos que parecem completos: uma resposta cortada nunca derruba o site.
-    if (pagina.includes("</html>") && pagina.includes("Roteirista") && pagina !== APP) {
-      gravar(join(PASTA, "index.html"), pagina); APP = pagina; console.log("Atualizado: página do Roteirista");
+    if (pagina.includes("</html>") && pagina.includes("AI Prompter") && pagina !== APP) {
+      gravar(join(PASTA, "index.html"), pagina); APP = pagina; console.log("Atualizado: página do AI Prompter");
     }
     if (login.includes("</html>") && login.includes("/entrar") && login !== LOGIN) {
       gravar(join(PASTA, "login.html"), login); LOGIN = login; console.log("Atualizado: tela de login");
