@@ -1,0 +1,53 @@
+# Vigia do site: confere o AI Prompter a cada 5 minutos, de graça, pelo próprio GitHub.
+# Se cair (3 tentativas seguidas falhando), abre um aviso "🔴 fora do ar" no repositório:
+# o GitHub notifica o dono por e-mail e no app. Quando volta, fecha o aviso sozinho.
+name: Vigia do site
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: vigia
+  cancel-in-progress: false
+
+jobs:
+  checar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confere o site
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          URL: https://roteiros.murinoi.com/saude
+          TZ: America/Sao_Paulo
+        run: |
+          ok=0
+          for i in 1 2 3; do
+            if curl -fsS -m 15 "$URL" | grep -q ok; then ok=1; break; fi
+            sleep 20
+          done
+          aberto=$(gh issue list --label site-fora --state open --json number --jq '.[0].number // empty')
+          if [ "$ok" = 1 ]; then
+            echo "Site no ar."
+            if [ -n "$aberto" ]; then gh issue close "$aberto" --comment "✅ O site voltou às $(date +'%H:%M de %d/%m')."; fi
+            exit 0
+          fi
+          echo "Site fora do ar."
+          if [ -z "$aberto" ]; then
+            gh label create site-fora --color B60205 --description "Aberto pelo vigia quando o site cai" --force
+            gh issue create --label site-fora --title "🔴 AI Prompter fora do ar" --body "O vigia não conseguiu abrir $URL em 3 tentativas seguidas (às $(date +'%H:%M de %d/%m')).
+
+          @wyterlin1-svg, no terminal do VPS:
+          \`\`\`
+          docker ps
+          docker logs --tail 100 roteirista-40s
+          \`\`\`
+          Este aviso fecha sozinho quando o site voltar."
+          fi
+          exit 1
