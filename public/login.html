@@ -6,20 +6,28 @@
 <title>Entrar · AI Prompter</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
-  /* Layout: claquete de estúdio — texto de abertura à esquerda, cartão de acesso à direita; empilha no celular. */
+  /* Layout: cabine de estúdio — abertura à esquerda, cartão de acesso à direita; empilha no celular. */
   :root {
-    --bg: #f2f2f6; --surface: #ffffff; --sunk: #e8e8f0; --fg: #16141f; --muted: #646178; --line: #dcdbe6;
-    --accent: #e0305f; --accent-soft: #fbe3ea; --on-accent: #ffffff; --bad: #c72f2f; --ok: #138a4c;
-    --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
-    --f-body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
-    --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    --bg: #05060a; --surface: rgba(16, 18, 27, .66); --solid: #0f1119; --sunk: rgba(255, 255, 255, .045); --fg: #e8ebf3; --muted: #8b91a4;
+    --line: rgba(255, 255, 255, .08); --line-forte: rgba(255, 255, 255, .16);
+    --accent: #5ee7ff; --accent-soft: rgba(94, 231, 255, .12); --on-accent: #02131a; --brilho: rgba(94, 231, 255, .45); --violeta: #8b7bff;
+    --ok: #3ee08f; --warn: #ffc14d; --bad: #ff6b72;
+    --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+    --f-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    color-scheme: dark;
   }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #121119; --surface: #1b1a25; --sunk: #24222f; --fg: #f1f0f6; --muted: #a29fb5; --line: #2f2d3c;
-      --accent: #ff5a85; --accent-soft: #3a1a26; --on-accent: #1a0b11; --bad: #ff7272; --ok: #45d08a; color-scheme: dark; }
-  }
+  /* Atmosfera: grade fina e dois brilhos fixos, só CSS (nenhuma imagem para baixar). */
+  body { isolation: isolate; min-height: 100vh; }
+  body::before, body::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+  body::before { background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 44px 44px; -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 20%, transparent 75%); mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 20%, transparent 75%); }
+  body::after { background: radial-gradient(640px 420px at 12% -8%, rgba(94,231,255,.16), transparent 70%), radial-gradient(720px 520px at 100% 0%, rgba(139,123,255,.14), transparent 70%); }
+  ::selection { background: var(--accent); color: var(--on-accent); }
+  @keyframes entra { from { opacity: 0; transform: translateY(8px); } }
+  .vidro { backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 20px 50px -30px rgba(0,0,0,.8); }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); }
@@ -28,34 +36,37 @@
     padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
   @media (max-width: 820px) { .palco { grid-template-columns: minmax(0, 1fr); gap: 28px; align-content: center; } }
 
-  .rec { font: 600 12px var(--f-mono); color: var(--accent); display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: .1em; }
-  .rec::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); animation: pisca 1.6s infinite; }
+  .rec { font: 600 11px var(--f-mono); color: var(--accent); display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: .12em; border: 1px solid var(--line); background: var(--sunk); border-radius: 99px; padding: 6px 12px; }
+  .rec::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: pisca 1.6s infinite; }
   @keyframes pisca { 50% { opacity: .25; } }
-  h1 { font: 800 clamp(40px, 7vw, 76px)/.95 var(--f-display); letter-spacing: -0.04em; margin: 14px 0 0; }
-  h1 .tc { display: block; font-family: var(--f-mono); font-weight: 700; color: var(--accent); font-size: .62em; letter-spacing: -0.02em; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  h1 { font: 700 clamp(40px, 7vw, 76px)/.95 var(--f-display); letter-spacing: -0.05em; margin: 18px 0 0; background: linear-gradient(100deg, var(--fg) 45%, var(--accent)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  h1 .tc { display: block; font-family: var(--f-mono); font-weight: 700; color: var(--accent); font-size: .62em; letter-spacing: -0.02em; margin-top: 6px; font-variant-numeric: tabular-nums; -webkit-text-fill-color: var(--accent); text-shadow: 0 0 22px var(--brilho); }
   .abertura p { color: var(--muted); max-width: 40ch; margin: 18px 0 0; font-size: 16px; text-wrap: pretty; }
   .regua { display: flex; gap: 3px; margin-top: 26px; max-width: 420px; height: 10px; }
-  .regua i { flex: 1; border-radius: 3px; background: var(--accent-soft); }
-  .regua i.on { background: var(--accent); }
+  .regua i { flex: 1; border-radius: 3px; background: rgba(255,255,255,.07); transition: background .2s, box-shadow .2s; }
+  .regua i.on { background: var(--accent); box-shadow: 0 0 10px -1px var(--brilho); }
   .escala { display: flex; justify-content: space-between; max-width: 420px; font: 500 11px var(--f-mono); color: var(--muted); margin-top: 6px; }
   @media (max-width: 820px) { .abertura p, .regua, .escala { display: none; } }
 
-  form { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 28px 24px; display: grid; gap: 16px; }
+  form { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 28px 24px; display: grid; gap: 16px; animation: entra .5s ease both; }
   form h2 { margin: 0; font: 700 22px var(--f-display); letter-spacing: -0.01em; }
   form .sub { margin: -10px 0 0; color: var(--muted); font-size: 14px; }
   label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
   .campo { position: relative; }
-  input { width: 100%; padding: 13px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; font-size: 16px; }
+  input { width: 100%; padding: 13px 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.35); color: var(--fg); font: inherit; font-size: 16px; transition: border-color .15s, box-shadow .15s; }
+  input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .ver { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: 0; color: var(--muted); font: 600 12px var(--f-mono); padding: 8px; cursor: pointer; text-transform: uppercase; letter-spacing: .06em; }
   #senha { padding-right: 76px; }
-  .entrar { border: 0; border-radius: 12px; padding: 15px; background: var(--accent); color: var(--on-accent); font: 700 17px var(--f-display); cursor: pointer; letter-spacing: -0.01em; }
+  .entrar { border: 0; border-radius: 12px; padding: 15px; background: var(--accent); color: var(--on-accent); font: 700 17px var(--f-display); cursor: pointer; letter-spacing: -0.01em; box-shadow: 0 12px 36px -10px var(--brilho); transition: box-shadow .15s, transform .15s; }
+  .entrar:hover:not(:disabled) { box-shadow: 0 14px 46px -8px var(--brilho); }
+  .entrar:active:not(:disabled) { transform: translateY(1px); }
   .entrar:disabled { opacity: .6; cursor: progress; }
   .aviso { margin: 0; font-size: 14px; border-radius: 10px; padding: 10px 12px; }
   .aviso.erro { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
   .aviso.ok { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
   .rodape { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
-  @media (prefers-reduced-motion: reduce) { .rec::before { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .rec::before, form { animation: none; } }
 </style>
 </head>
 <body>
@@ -68,7 +79,7 @@
     <div class="escala" aria-hidden="true"><span>00:00</span><span>00:40</span></div>
   </section>
 
-  <form method="post" action="/entrar" id="form">
+  <form method="post" action="/entrar" id="form" class="vidro">
     <h2>Entrar</h2>
     <p class="sub">Use o acesso que você recebeu.</p>
     <p class="aviso" id="aviso" role="alert" hidden></p>

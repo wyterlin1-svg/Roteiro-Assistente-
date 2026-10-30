@@ -83,7 +83,7 @@ let LOGIN = readFileSync(join(PASTA, "login.html"), "utf8");
 let APP = readFileSync(join(PASTA, "index.html"), "utf8");
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // Botão de sair, colocado sobre a página do AI Prompter só quando servida por aqui.
-const comSair = (nome) => APP.replace("</body>", `<a href="/sair" id="sair-sessao" style="position:fixed;z-index:10;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));font:600 13px var(--f-body,system-ui);color:var(--fg,#16141f);background:var(--surface,#fff);border:1px solid var(--line,#dcdbe6);border-radius:99px;padding:8px 14px;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.08)">${esc(nome)} · Sair</a>\n</body>`);
+const comSair = (nome) => APP.replace("</body>", `<a href="/sair" id="sair-sessao" style="position:fixed;z-index:10;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));font:600 13px var(--f-body,system-ui);color:var(--fg,#e8ebf3);background:var(--surface,#10121b);border:1px solid var(--line,#272a36);border-radius:99px;padding:8px 14px;text-decoration:none;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 24px -10px rgba(0,0,0,.8)">${esc(nome)} · Sair</a>\n</body>`);
 
 const SEGURANCA = { "x-content-type-options": "nosniff", "x-frame-options": "SAMEORIGIN", "referrer-policy": "same-origin", "cache-control": "no-store" };
 function enviar(res, status, corpo, extra = {}) {
@@ -438,10 +438,10 @@ function paginaPublica(titulo, corpo) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(titulo)} · AI Prompter</title>
 <style>
-  :root { --bg: #f2f2f6; --surface: #fff; --fg: #16141f; --muted: #646178; --line: #dcdbe6; --accent: #e0305f; --ok: #138a4c; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #121119; --surface: #1b1a25; --fg: #f1f0f6; --muted: #a29fb5; --line: #2f2d3c; --accent: #ff5a85; --ok: #45d08a; color-scheme: dark; } }
+  :root { --bg: #05060a; --surface: #0f1119; --fg: #e8ebf3; --muted: #8b91a4; --line: rgba(255,255,255,.09); --accent: #5ee7ff; --ok: #3ee08f; color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.65 "Helvetica Neue", Arial, sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background-image: radial-gradient(640px 420px at 10% -10%, rgba(94,231,255,.12), transparent 70%); background-attachment: fixed; }
   main { max-width: 760px; margin: 0 auto; padding: 36px max(20px, env(safe-area-inset-left, 0px)) 60px; }
   .marca { font: 700 13px ui-monospace, Menlo, monospace; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; }
   h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.1; letter-spacing: -0.02em; margin: 8px 0 6px; }
