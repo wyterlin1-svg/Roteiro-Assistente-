@@ -360,7 +360,7 @@ async function rotasInstagram(req, res, pathname, quem) {
 // escolhe sozinho o melhor disponível, na ordem de "preferidos". O YAML pode fixar um.
 const PROVEDORES = [
   { id: "gemini", nome: "Google Gemini", chave: process.env.GEMINI_API_KEY, base: "https://generativelanguage.googleapis.com/v1beta/openai", modelo: process.env.GEMINI_MODELO,
-    preferidos: [/^gemini-2\.5-flash$/, /^gemini-[\d.]+-flash$/, /^gemini-flash-latest$/, /^gemini-[\d.]+-flash-lite$/], extra: { reasoning_effort: "low" }, maxTokens: 8000 },
+    preferidos: [/^gemini-flash-latest$/, /^gemini-[\d.]+-flash$/, /^gemini-[\d.]+-flash-preview/, /^gemini-[\d.]+-flash-lite/], reserva: /^gemini/, extra: { reasoning_effort: "low" }, maxTokens: 8000 },
   { id: "groq", nome: "Groq", chave: process.env.GROQ_API_KEY, base: "https://api.groq.com/openai/v1", modelo: process.env.GROQ_MODELO,
     preferidos: [/^llama-3\.3-70b-versatile$/, /^openai\/gpt-oss-120b$/, /^meta-llama\/llama-4-maverick/, /^moonshotai\/kimi-k2-instruct/, /^qwen\/qwen3-32b$/, /70b/] },
   { id: "cerebras", nome: "Cerebras", chave: process.env.CEREBRAS_API_KEY, base: "https://api.cerebras.ai/v1", modelo: process.env.CEREBRAS_MODELO,
@@ -406,8 +406,10 @@ async function iaEscolherModelo(p, evitar) {
   if (!r.ok) throw Object.assign(new Error(iaDiagnostico(r.status, texto).motivo), { status: r.status, texto });
   const ids = (JSON.parse(texto).data || []).map((m) => String(m.id).replace(/^models\//, ""));
   if (p.modelo && p.modelo !== evitar && ids.includes(p.modelo)) return p.modelo;
-  for (const re of p.preferidos) {
-    const achados = ids.filter((id) => re.test(id) && id !== evitar && !/image|tts|audio|vision|embed|guard|whisper|live|preview|exp/.test(id));
+  // Na ordem de preferência (estável antes de "preview"); por fim, qualquer modelo de texto da conta.
+  const texto_ = (id) => id !== evitar && !/image|tts|audio|vision|embed|guard|whisper|live|transcri|moderation|rerank|ocr/.test(id);
+  for (const re of [...p.preferidos, p.reserva || /./]) for (const estavel of [true, false]) {
+    const achados = ids.filter((id) => re.test(id) && texto_(id) && (!estavel || !/preview|exp/.test(id)));
     if (achados.length) return achados.sort((a, b) => b.localeCompare(a, "en", { numeric: true }))[0];
   }
   throw new Error("nenhum modelo de texto disponível nesta conta");
