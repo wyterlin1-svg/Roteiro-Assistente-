@@ -1,4 +1,4 @@
-# Roteirista 40s
+# AI Prompter
 
 Agente de roteiros de Reels de até 40 segundos, guiado pelo algoritmo do Instagram: gancho nos 3 primeiros segundos, emoção, cortes a cada 3 a 5 segundos, final que emenda no começo e um motivo para mandarem o vídeo para alguém.
 
@@ -6,7 +6,7 @@ Agente de roteiros de Reels de até 40 segundos, guiado pelo algoritmo do Instag
 - Falas fora da caixa: cada roteiro explica o assunto com um objeto do dia a dia que não tem nada a ver com o nicho.
 - Funciona para **qualquer pessoa**: sem cadastro, sem chave de API e sem custo por roteiro. Tudo roda no navegador de quem usa.
 - **🎲 Roteiro viral aleatório:** sorteia tema, estilo, objeto, formato e duração, puxando para o que já entregou mais com o seu público (80%) e testando o novo (20%).
-- **📊 Aprende com os seus Reels:** você anota 6 números do Insights e o Roteirista calcula um Índice de Entrega e descobre o que o seu público premia.
+- **📊 Aprende com os seus Reels:** você anota 6 números do Insights e o AI Prompter calcula um Índice de Entrega e descobre o que o seu público premia.
 - **🔬 Raio-X:** cole o texto de qualquer Reel e veja como ele se sai nos sinais do algoritmo.
 - Servidor de um arquivo só (`servidor.js`), sem dependências, com tela de login.
 
@@ -48,7 +48,7 @@ Use [`hostinger-https.yml`](hostinger-https.yml) no lugar do `hostinger.yml`. El
 
 ## Conectar com o Instagram
 
-Cada usuário pode conectar a própria conta **profissional** (criador ou empresa) do Instagram. O Roteirista busca os últimos Reels com as métricas oficiais (visualizações, alcance, curtidas, comentários, salvamentos, compartilhamentos, tempo médio assistido e taxa de pulos), mostra o que funciona no perfil (melhor dia, horário, tipo de legenda) e permite vincular cada Reel ao roteiro gravado para alimentar o aprendizado. É só leitura: nada é postado. O token fica só no servidor.
+Cada usuário pode conectar a própria conta **profissional** (criador ou empresa) do Instagram. O AI Prompter busca os últimos Reels com as métricas oficiais (visualizações, alcance, curtidas, comentários, salvamentos, compartilhamentos, tempo médio assistido e taxa de pulos), mostra o que funciona no perfil (melhor dia, horário, tipo de legenda) e permite vincular cada Reel ao roteiro gravado para alimentar o aprendizado. É só leitura: nada é postado. O token fica só no servidor.
 
 Para ativar (uma vez, pelo administrador):
 
@@ -59,7 +59,7 @@ Para ativar (uma vez, pelo administrador):
 5. No YAML, em `environment`, adicione `INSTAGRAM_APP_ID` e `INSTAGRAM_APP_SECRET` e implante de novo.
 6. Em **Configurações do app > Básico**, preencha:
    - **URL da Política de Privacidade:** `https://roteiros.murinoi.com/privacidade`
-   - **URL de exclusão de dados do usuário:** `https://roteiros.murinoi.com/exclusao-de-dados` (como instruções) ou, como callback, o mesmo endereço: a Meta envia o `signed_request`, o Roteirista apaga os dados e devolve o código de confirmação.
+   - **URL de exclusão de dados do usuário:** `https://roteiros.murinoi.com/exclusao-de-dados` (como instruções) ou, como callback, o mesmo endereço: a Meta envia o `signed_request`, o AI Prompter apaga os dados e devolve o código de confirmação.
 7. Em **Configurar login comercial do Instagram**, use `https://roteiros.murinoi.com/instagram/desautorizar` como **URL de retorno de chamada de desautorização** e `https://roteiros.murinoi.com/exclusao-de-dados` como **URL de solicitação de exclusão de dados**.
 8. Opcional: no YAML, `RESPONSAVEL` (seu nome ou empresa) e `CONTATO_EMAIL` aparecem nas duas páginas.
 
@@ -98,7 +98,7 @@ Variáveis opcionais: `ATUALIZACAO=0` desliga, `ATUALIZACAO_MINUTOS=10` muda o i
 
 ```
 servidor.js          servidor com tela de login (Node, sem dependências)
-public/index.html    o Roteirista (interface, motor de roteiros e teleprompter)
+public/index.html    o AI Prompter (interface, motor de roteiros e teleprompter)
 public/login.html    a tela de login
 hostinger.yml        instalação na Hostinger, sem build
 Dockerfile           imagem baseada em node:alpine

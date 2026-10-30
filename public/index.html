@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Agente de roteiros de Reels de até 40 segundos guiado pelo algoritmo do Instagram.">
-<title>Roteirista 40s</title>
+<title>AI Prompter</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
@@ -189,7 +189,7 @@
 <div class="wrap">
   <header class="topo">
     <div>
-      <h1>Roteirista <span class="seg">00:40</span></h1>
+      <h1>AI Prompter <span class="seg">00:40</span></h1>
       <p class="lema">Agente de roteiros para Reels: gancho nos 3 primeiros segundos, emoção, loop e um motivo para mandarem seu vídeo para alguém. Grátis e sem cadastro.</p>
     </div>
     <span class="rec" id="modo">pronto para criar</span>
@@ -1024,7 +1024,7 @@ function blocoInstagram() {
   if (!ig.configurado) return `<div class="ig"><b>📱 Instagram</b><p class="vazio">A conexão com o Instagram ainda não foi ativada neste servidor. O administrador precisa criar um app na Meta e colocar <code>INSTAGRAM_APP_ID</code> e <code>INSTAGRAM_APP_SECRET</code> no YAML.</p></div>`;
   const falha = ig.falha ? `<p class="aviso-ig"><b>Última tentativa não deu certo.</b> ${esc(ig.falha)}</p>` : "";
   if (!ig.conectado) return `<div class="ig"><b>📱 Instagram</b>${falha}
-    <p class="vazio">Conecte sua conta profissional (criador ou empresa) e eu analiso seus Reels de verdade: alcance, tempo assistido, compartilhamentos, salvamentos e taxa de pulos. Só leitura: o Roteirista nunca posta nada.</p>
+    <p class="vazio">Conecte sua conta profissional (criador ou empresa) e eu analiso seus Reels de verdade: alcance, tempo assistido, compartilhamentos, salvamentos e taxa de pulos. Só leitura: o AI Prompter nunca posta nada.</p>
     <a class="botao-ig" href="/instagram/conectar">Conectar Instagram</a>
     <p class="vazio">Endereço de retorno para cadastrar no app da Meta: <code>${esc(ig.retorno || "")}</code></p></div>`;
   const a = analisarInstagram();
@@ -1184,7 +1184,7 @@ function blocoLaboratorio() {
     ${ap ? `<p class="vazio" style="margin-top:6px">Base: ${ap.n} Reel(s) com resultado · Índice de Entrega médio: <b>${Math.round(ap.media)}</b>. O botão <b>🎲 Roteiro viral aleatório</b> já usa isso.</p>
       <div class="campeoes">${top.map((c) => `<div><b>melhor ${c.nome}</b>${esc(c.v)}<br><span>índice ${Math.round(c.m)} · ${c.n} Reel(s)</span></div>`).join("")}</div>`
     : `<p class="vazio" style="margin-top:6px">Ainda sem dados. Poste um roteiro, registre os números em <b>📊 Resultado deste Reel</b>, e aqui aparecem o estilo, o objeto, o formato, a emoção e a duração que mais entregam para você.</p>`}
-    <details style="margin-top:14px"><summary><b>Como o algoritmo do Instagram decide, e o que o Roteirista faz com isso</b></summary>
+    <details style="margin-top:14px"><summary><b>Como o algoritmo do Instagram decide, e o que o AI Prompter faz com isso</b></summary>
       <ol class="algoritmo">
         <li><b>Tempo assistido.</b> É o sinal mais forte. → Gancho em até 3s, cortes a cada 3 a 5s, final que emenda no começo para o replay.</li>
         <li><b>Envios por alcance</b> (compartilhamentos por DM). É o que mais leva o Reel a quem não te segue. → Todo roteiro tem um "gatilho de envio": para quem a pessoa vai mandar.</li>
@@ -1193,7 +1193,7 @@ function blocoLaboratorio() {
         <li><b>Originalidade.</b> Conteúdo reciclado ou genérico é rebaixado. → Metáfora de objeto inesperado e lista de frases de IA proibidas.</li>
         <li><b>Teste com quem não te segue.</b> Use os Reels de teste (trial reels) com os 3 ganchos sugeridos e mantenha o que segurar mais.</li>
       </ol>
-      <p class="vazio" style="margin-top:10px">Baseado no que o Instagram divulga publicamente sobre o ranqueamento de Reels. O código do algoritmo é secreto; por isso o Roteirista também aprende com os seus números reais. As referências do Índice de Entrega (por 1.000 visualizações: ${REFS.envios} envios, ${REFS.salvos} salvamentos, ${REFS.curtidas} curtidas, ${REFS.comentarios} comentários) são metas de comparação, não números oficiais.</p>
+      <p class="vazio" style="margin-top:10px">Baseado no que o Instagram divulga publicamente sobre o ranqueamento de Reels. O código do algoritmo é secreto; por isso o AI Prompter também aprende com os seus números reais. As referências do Índice de Entrega (por 1.000 visualizações: ${REFS.envios} envios, ${REFS.salvos} salvamentos, ${REFS.curtidas} curtidas, ${REFS.comentarios} comentários) são metas de comparação, não números oficiais.</p>
     </details>
   </section>`;
 }

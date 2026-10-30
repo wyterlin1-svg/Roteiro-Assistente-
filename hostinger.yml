@@ -1,4 +1,4 @@
-# Roteirista 40s na Hostinger (VPS > Docker Manager), com tela de login própria,
+# AI Prompter na Hostinger (VPS > Docker Manager), com tela de login própria,
 # sem mexer no site principal (não usa as portas 80/443).
 #
 # ACESSOS: edite a linha USUARIOS abaixo, no formato usuario:senha,
