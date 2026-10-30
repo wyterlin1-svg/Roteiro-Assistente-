@@ -76,10 +76,12 @@ O servidor pode escrever os roteiros com várias IAs gratuitas, uma de reserva p
 | `MISTRAL_API_KEY` | console.mistral.ai/api-keys |
 | `GITHUB_MODELS_TOKEN` | github.com/settings/tokens (permissão Models) |
 
-- Os pedidos são distribuídos entre as IAs; a que bater no limite entra em pausa (1 h se for cota diária, alguns segundos se for por minuto, 6 h se a chave for inválida) e volta sozinha.
-- Se todas estiverem no limite, o motor próprio escreve o roteiro: o usuário nunca fica sem resposta.
+- A IA é sempre o padrão. O motor próprio só escreve quando o usuário escolhe **Motor próprio** em "Quem escreve".
+- Os pedidos são distribuídos entre as IAs; a que bater no limite entra em pausa (1 h se for cota diária, alguns segundos se for por minuto, 6 h se a chave for inválida), o pedido passa na hora para a próxima, e ela volta sozinha.
+- Ao ligar, o servidor confere cada chave e escolhe sozinho o melhor modelo disponível na conta; se um provedor aposentar o modelo, ele troca na hora. O log mostra tudo: `docker logs roteirista-40s 2>&1 | grep IA`.
+- Embaixo de "Quem escreve", a página mostra o estado de cada IA (pronta, ou em pausa até que horas e por quê). Se nenhuma responder, aparece o motivo de cada uma.
 - Cada usuário pode fazer até 40 pedidos de IA por hora (`IA_LIMITE_HORA` muda isso).
-- O modelo de cada provedor pode ser trocado com `GEMINI_MODELO`, `GROQ_MODELO`, `CEREBRAS_MODELO`, `OPENROUTER_MODELO`, `MISTRAL_MODELO` e `GITHUB_MODELO`.
+- Para fixar um modelo: `GEMINI_MODELO`, `GROQ_MODELO`, `CEREBRAS_MODELO`, `OPENROUTER_MODELO`, `MISTRAL_MODELO` ou `GITHUB_MODELO`.
 - Dados do Instagram nunca são enviados a essas IAs.
 
 ## Atualizar

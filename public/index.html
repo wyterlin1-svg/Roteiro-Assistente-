@@ -51,6 +51,7 @@
   .painel h2, .folha h2 { font: 700 13px var(--f-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0; }
   label { display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
   label small { font-weight: 400; color: var(--muted); }
+  .ia-info { display: block; margin-top: 4px; font-size: 12px; line-height: 1.4; }
   .lacuna { background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 0 3px; }
   .fala[contenteditable] { border-radius: 6px; cursor: text; }
   .fala[contenteditable]:hover { background: var(--sunk); }
@@ -221,10 +222,10 @@
       </div>
 
       <label id="motorBox" hidden>Quem escreve
-        <select id="motor">
+        <select id="motor" autocomplete="off">
           <option value="ia">IA do Claude (mais criativa, usa sua conta)</option>
           <option value="proprio">Motor próprio (instantâneo, sem IA)</option>
-        </select></label>
+        </select><small id="iaInfo" class="ia-info"></small></label>
 
       <button class="go" id="criar">Criar roteiro</button>
       <button type="button" class="viral" id="viral">🎲 Roteiro viral aleatório</button>
@@ -683,17 +684,24 @@ async function enviarAoServidor() {
     status("Não consegui salvar no servidor agora. Os dados ficaram neste aparelho e vão junto no próximo salvamento.", true);
   }
 }
+// No servidor a IA é sempre o padrão; o motor próprio só roda se o usuário escolher.
 async function carregarIA() {
   try {
     const r = await fetch("/api/ia", { cache: "no-store" });
-    if (!r.ok) return;
-    const { provedores } = await r.json();
-    if (!provedores?.length || sample) return;
+    if (!r.ok || sample) return;
+    const { provedores = [] } = await r.json();
     iaServidor = provedores;
-    $("motor").options[0].textContent = `IA gratuita (${provedores.map((p) => p.nome).join(", ")})`;
+    $("motor").value = "ia";
+    $("motor").options[0].textContent = provedores.length ? `IA gratuita (${provedores.map((p) => p.nome).join(", ")})` : "IA (nenhuma chave configurada no servidor)";
     $("motor").options[1].textContent = "Motor próprio (instantâneo, sem IA)";
     $("motorBox").hidden = false;
+    mostrarIAs();
   } catch {}
+}
+function mostrarIAs() {
+  const hora = (iso) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  $("iaInfo").textContent = $("motor").value !== "ia" || !iaServidor ? "" : !iaServidor.length ? "Coloque GEMINI_API_KEY, GROQ_API_KEY… no YAML." :
+    iaServidor.map((p) => p.disponivel ? `${p.nome} ✓` : `${p.nome} em pausa até ${hora(p.volta)} (${p.motivo})`).join(" · ");
 }
 async function carregarDoServidor() {
   let dados;
@@ -712,7 +720,7 @@ async function carregarDoServidor() {
   }
   $("modo").textContent = "salvo no servidor";
   carregarInstagram();
-  carregarIA();
+  iaCarregando = carregarIA();
   const retorno = new URLSearchParams(location.search).get("instagram");
   const avisos = { conectado: ["Instagram conectado. Seus Reels foram analisados: veja no painel 🧠.", false], cancelado: ["Conexão com o Instagram cancelada.", true],
     expirou: ["A conexão demorou demais. Clique em Conectar Instagram de novo.", true], erro: ["Não consegui conectar ao Instagram. Confira se a conta é profissional e tente de novo.", true],
@@ -737,7 +745,7 @@ const ERROS = {
   invalid_json: "A resposta veio fora do formato. Clique de novo para tentar outra vez.",
   empty_completion: "A resposta veio vazia. Tente de novo.",
 };
-const msgErro = (e) => ERROS[e?.code] || "Algo falhou na conexão com o Claude. Tente de novo.";
+const msgErro = (e) => ERROS[e?.code] || `Algo falhou na conexão com ${sample ? "o Claude" : "a IA"}. Tente de novo.`;
 
 function status(t, erro) { $("status").textContent = t; $("status").classList.toggle("erro", !!erro); }
 function travar(sim) { ocupado = sim; ["criar", "semIdeia", "rolar", "viral", "analisar"].forEach((id) => ($(id).disabled = sim)); document.querySelectorAll("[data-acao]").forEach((b) => (b.disabled = sim)); }
@@ -753,17 +761,29 @@ function briefing() {
 
 // ===== Chamadas à IA =====
 // No artefato do Claude: a IA do próprio Claude. No seu servidor: as IAs gratuitas em
-// revezamento (Gemini, Groq…). Se a IA falhar no servidor, o motor próprio assume.
-let iaServidor = null; // [{ nome, disponivel }] quando o servidor tem IAs configuradas
-const temIA = () => !!sample || !!iaServidor?.length;
-const usarIA = () => temIA() && $("motor").value === "ia";
+// revezamento (Gemini, Groq…). O motor próprio só escreve quando o usuário escolhe.
+let iaServidor = null; // [{ nome, disponivel }] no servidor (lista vazia se não houver chaves)
+let iaCarregando = null;
+const temIA = () => !!sample || !!iaServidor;
+const usarIA = async () => { await iaCarregando; return temIA() && $("motor").value === "ia"; };
+// Algumas IAs embrulham o roteiro ({ "roteiro": { cenas… } }): desembrulha.
+const acharRoteiro = (r) => !r || typeof r !== "object" ? null : Array.isArray(r.cenas) && r.cenas.length ? r : Object.values(r).map(acharRoteiro).find(Boolean) || null;
+async function atualizarIAs() {
+  if (sample || !iaServidor) return;
+  try { iaServidor = (await (await fetch("/api/ia", { cache: "no-store" })).json()).provedores || iaServidor; mostrarIAs(); } catch {}
+}
+function erroIA(e) {
+  if (e?.code !== "ia_ocupada") return msgErro(e);
+  const det = e.falhas?.length ? ` (${e.falhas.join("; ")})` : "";
+  return `${e.message || "Nenhuma IA respondeu agora."}${det}. Clique de novo para tentar, ou escolha "Motor próprio" em Quem escreve.`;
+}
 async function pedirIA(b, montarPrompt, tier) {
   if (sample) return { dados: await sample.json(montarPrompt(b), { modelTier: tier, cache: false }), provedor: "Claude" };
   // Dados do Instagram (no aprendizado) não vão para IAs de terceiros.
   const r = await fetch("/api/ia", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: montarPrompt({ ...b, aprendido: "" }) }) });
   const j = await r.json().catch(() => ({}));
   if (r.status === 401) throw { code: "session_expired" };
-  if (!r.ok) throw { code: "ia_ocupada", message: j.erro };
+  if (!r.ok) throw { code: "ia_ocupada", message: j.erro, falhas: j.falhas };
   return { dados: j.resultado, provedor: j.provedor };
 }
 
@@ -781,7 +801,7 @@ function entregar(r, b, motor) {
 async function criarRoteiro(ajuste) {
   const b = briefing();
   if (!b.nicho) { status("Escreva seu nicho para começar.", true); $("nicho").focus(); return; }
-  if (!usarIA()) {
+  if (!(await usarIA())) {
     entregar(motorRoteiro(b), b, true);
     status("Pronto. Toque em qualquer fala para ajustar ao seu jeito de falar.");
     return;
@@ -791,25 +811,24 @@ async function criarRoteiro(ajuste) {
   const relogio = setInterval(() => status(`Escrevendo seu roteiro… ${Math.round((Date.now() - t0) / 1000)}s`), 1000);
   status("Escrevendo seu roteiro…");
   try {
-    const { dados: r, provedor } = await pedirIA(b, (x) => promptRoteiro(x, ajuste), "default");
-    if (!r || !Array.isArray(r.cenas) || !r.cenas.length) throw { code: "invalid_json" };
+    const { dados, provedor } = await pedirIA(b, (x) => promptRoteiro(x, ajuste), "default");
+    const r = acharRoteiro(dados);
+    if (!r) throw { code: "invalid_json" };
     status("");
     entregar(r, { ...b, provedor }, false);
   } catch (e) {
-    if (!sample && e.code !== "session_expired") { // no servidor nunca fica sem roteiro
-      entregar(motorRoteiro(b), b, true);
-      status("As IAs gratuitas estão no limite agora; o motor próprio escreveu este roteiro.");
-    } else status(msgErro(e), true);
+    status(erroIA(e), true);
   } finally {
     clearInterval(relogio);
     travar(false);
+    atualizarIAs();
   }
 }
 
 async function gerarIdeias() {
   const b = briefing();
   if (!b.nicho) { status("Escreva seu nicho e eu crio as ideias.", true); $("nicho").focus(); return; }
-  if (!usarIA()) {
+  if (!(await usarIA())) {
     ideias = motorIdeias(b);
     status("Escolha uma ideia para virar roteiro.");
     render();
@@ -827,14 +846,10 @@ async function gerarIdeias() {
     render();
     $("folha").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) {
-    if (!sample && e.code !== "session_expired") {
-      ideias = motorIdeias(b);
-      status("As IAs gratuitas estão no limite agora; o motor próprio criou estas ideias.");
-      render();
-      $("folha").scrollIntoView({ behavior: "smooth", block: "start" });
-    } else status(msgErro(e), true);
+    status(erroIA(e), true);
   } finally {
     travar(false);
+    atualizarIAs();
   }
 }
 
@@ -936,7 +951,7 @@ function roteiroViral() {
 async function criarViral() {
   if (!$("nicho").value.trim()) { status("Escreva seu nicho e eu sorteio o roteiro.", true); $("nicho").focus(); return; }
   const b = roteiroViral();
-  if (!usarIA()) {
+  if (!(await usarIA())) {
     entregar(motorRoteiro(b), b, true);
     status("Roteiro sorteado. Depois de postar, registre os números para eu aprender.");
     return;
@@ -944,17 +959,16 @@ async function criarViral() {
   travar(true);
   status("Sorteando e escrevendo com a IA…");
   try {
-    const { dados: r, provedor } = await pedirIA(b, (x) => promptRoteiro(x), "default");
-    if (!r || !Array.isArray(r.cenas) || !r.cenas.length) throw { code: "invalid_json" };
+    const { dados, provedor } = await pedirIA(b, (x) => promptRoteiro(x), "default");
+    const r = acharRoteiro(dados);
+    if (!r) throw { code: "invalid_json" };
     status("");
     entregar(r, { ...b, provedor }, false);
   } catch (e) {
-    if (!sample && e.code !== "session_expired") {
-      entregar(motorRoteiro(b), b, true);
-      status("As IAs gratuitas estão no limite agora; o motor próprio escreveu este roteiro.");
-    } else status(msgErro(e), true);
+    status(erroIA(e), true);
   } finally {
     travar(false);
+    atualizarIAs();
   }
 }
 
@@ -1381,6 +1395,7 @@ carregarDoServidor();
 (async () => {
   sample = window.claude ? await window.claude.use("sample").catch(() => null) : null;
   $("motorBox").hidden = !temIA();
+  $("motor").onchange = mostrarIAs;
   if (!noServidor) $("modo").textContent = sample ? "ia do claude disponível" : "pronto para criar";
 })();
 </script>

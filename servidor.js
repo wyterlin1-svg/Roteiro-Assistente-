@@ -353,16 +353,24 @@ async function rotasInstagram(req, res, pathname, quem) {
 // ---- IA gratuita com revezamento entre provedores ----
 // Cada provedor com chave configurada entra na fila. Os pedidos são distribuídos entre eles
 // (para gastar a cota grátis de todos por igual); o que bater no limite fica em pausa e
-// volta sozinho. Se todos estiverem em pausa, a página usa o motor próprio.
-// Todos falam o formato de chat da OpenAI; o modelo de cada um pode ser trocado no YAML.
+// volta sozinho, e o pedido passa na hora para o próximo. O motor próprio só roda quando
+// o usuário escolhe "Motor próprio" na página.
+// Todos falam o formato de chat da OpenAI. Os provedores trocam e aposentam modelos com
+// frequência: ao ligar (e quando um modelo some), o servidor lista os modelos da conta e
+// escolhe sozinho o melhor disponível, na ordem de "preferidos". O YAML pode fixar um.
 const PROVEDORES = [
-  { id: "gemini", nome: "Google Gemini", chave: process.env.GEMINI_API_KEY, url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", modelo: process.env.GEMINI_MODELO || "gemini-2.5-flash" },
-  { id: "groq", nome: "Groq", chave: process.env.GROQ_API_KEY, url: "https://api.groq.com/openai/v1/chat/completions", modelo: process.env.GROQ_MODELO || "llama-3.3-70b-versatile" },
-  { id: "cerebras", nome: "Cerebras", chave: process.env.CEREBRAS_API_KEY, url: "https://api.cerebras.ai/v1/chat/completions", modelo: process.env.CEREBRAS_MODELO || "llama-3.3-70b" },
-  { id: "openrouter", nome: "OpenRouter", chave: process.env.OPENROUTER_API_KEY, url: "https://openrouter.ai/api/v1/chat/completions", modelo: process.env.OPENROUTER_MODELO || "meta-llama/llama-3.3-70b-instruct:free" },
-  { id: "mistral", nome: "Mistral", chave: process.env.MISTRAL_API_KEY, url: "https://api.mistral.ai/v1/chat/completions", modelo: process.env.MISTRAL_MODELO || "mistral-small-latest" },
-  { id: "github", nome: "GitHub Models", chave: process.env.GITHUB_MODELS_TOKEN, url: "https://models.github.ai/inference/chat/completions", modelo: process.env.GITHUB_MODELO || "openai/gpt-4o-mini" },
-].filter((p) => p.chave);
+  { id: "gemini", nome: "Google Gemini", chave: process.env.GEMINI_API_KEY, base: "https://generativelanguage.googleapis.com/v1beta/openai", modelo: process.env.GEMINI_MODELO,
+    preferidos: [/^gemini-2\.5-flash$/, /^gemini-[\d.]+-flash$/, /^gemini-flash-latest$/, /^gemini-[\d.]+-flash-lite$/], extra: { reasoning_effort: "low" }, maxTokens: 8000 },
+  { id: "groq", nome: "Groq", chave: process.env.GROQ_API_KEY, base: "https://api.groq.com/openai/v1", modelo: process.env.GROQ_MODELO,
+    preferidos: [/^llama-3\.3-70b-versatile$/, /^openai\/gpt-oss-120b$/, /^meta-llama\/llama-4-maverick/, /^moonshotai\/kimi-k2-instruct/, /^qwen\/qwen3-32b$/, /70b/] },
+  { id: "cerebras", nome: "Cerebras", chave: process.env.CEREBRAS_API_KEY, base: "https://api.cerebras.ai/v1", modelo: process.env.CEREBRAS_MODELO,
+    preferidos: [/^llama-3\.3-70b$/, /^qwen-3-235b.*instruct/, /^gpt-oss-120b$/, /^llama-4-maverick/, /^zai-glm/, /^qwen-3/, /^llama/] },
+  { id: "openrouter", nome: "OpenRouter", chave: process.env.OPENROUTER_API_KEY, base: "https://openrouter.ai/api/v1", modelo: process.env.OPENROUTER_MODELO,
+    preferidos: [/^meta-llama\/llama-3\.3-70b-instruct:free$/, /^deepseek\/deepseek-chat.*:free$/, /^google\/gemini.*:free$/, /^qwen\/qwen3.*:free$/, /:free$/] },
+  { id: "mistral", nome: "Mistral", chave: process.env.MISTRAL_API_KEY, base: "https://api.mistral.ai/v1", modelo: process.env.MISTRAL_MODELO,
+    preferidos: [/^mistral-small-latest$/, /^mistral-medium-latest$/, /^mistral-large-latest$/] },
+  { id: "github", nome: "GitHub Models", chave: process.env.GITHUB_MODELS_TOKEN, base: "https://models.github.ai/inference", modelo: process.env.GITHUB_MODELO || "openai/gpt-4o-mini", semLista: true },
+].filter((p) => p.chave && p.chave.trim()).map((p) => ({ ...p, chave: p.chave.trim(), fixo: !!p.modelo }));
 const iaPausa = new Map(); // id -> { ate, motivo }
 let iaVez = 0;
 const iaUsoPorUsuario = new Map(); // limite por pessoa, para ninguém esgotar a cota de todos
@@ -376,56 +384,135 @@ function iaExtrairJson(texto) {
   if (!ini.length || fim <= Math.min(...ini)) throw new Error("a resposta não veio em JSON");
   return JSON.parse(t.slice(Math.min(...ini), fim + 1));
 }
-// Quanto tempo deixar um provedor descansando, conforme o erro.
-function iaTempoDePausa(status, texto, retryAfter) {
+// Traduz o erro do provedor em motivo legível e em quanto tempo deixá-lo descansando.
+function iaDiagnostico(status, texto, retryAfter) {
   const t = String(texto).toLowerCase();
-  if (status === 429) return /day|daily|quota|exceeded|per day|resource_exhausted|credits/.test(t) ? 3600e3 : Math.max(20e3, (Number(retryAfter) || 60) * 1000);
-  if (status === 401 || status === 403 || status === 402) return 6 * 3600e3; // chave inválida ou sem crédito
-  if ((status === 400 || status === 404) && /model/.test(t)) return 6 * 3600e3; // modelo não existe mais
-  return 60e3; // instabilidade passageira
+  if (status === 429) return /day|daily|quota|per day|resource_exhausted|credits|tokens per day|rpd|tpd/.test(t)
+    ? { motivo: "limite do dia atingido", pausa: 3600e3 }
+    : { motivo: "limite por minuto", pausa: Math.min(120e3, Math.max(15e3, (Number(retryAfter) || 30) * 1000)) };
+  if (status === 401 || status === 403) return { motivo: "chave recusada (confira a chave no YAML)", pausa: 6 * 3600e3 };
+  if (status === 402) return { motivo: "sem crédito na conta", pausa: 6 * 3600e3 };
+  if ((status === 400 || status === 404) && /model|decommission|not found|does not exist/.test(t)) return { motivo: "modelo indisponível", trocarModelo: true, pausa: 6 * 3600e3 };
+  if (status === 400 && /response_format|json_object|json mode/.test(t)) return { motivo: "não aceita modo JSON", semJson: true, pausa: 0 };
+  if (status === 400 && /context|too long|max_tokens|maximum/.test(t)) return { motivo: "pedido grande demais para este modelo", menosTokens: true, pausa: 0 };
+  return { motivo: `instabilidade (HTTP ${status})`, pausa: 45e3 };
+}
+
+// Lista os modelos da conta e escolhe o primeiro da ordem de preferidos (o mais novo, se vários casarem).
+async function iaEscolherModelo(p, evitar) {
+  if (p.semLista) return p.modelo;
+  const r = await fetch(`${p.base}/models`, { headers: { authorization: `Bearer ${p.chave}` }, signal: AbortSignal.timeout(15000) });
+  const texto = await r.text();
+  if (!r.ok) throw Object.assign(new Error(iaDiagnostico(r.status, texto).motivo), { status: r.status, texto });
+  const ids = (JSON.parse(texto).data || []).map((m) => String(m.id).replace(/^models\//, ""));
+  if (p.modelo && p.modelo !== evitar && ids.includes(p.modelo)) return p.modelo;
+  for (const re of p.preferidos) {
+    const achados = ids.filter((id) => re.test(id) && id !== evitar && !/image|tts|audio|vision|embed|guard|whisper|live|preview|exp/.test(id));
+    if (achados.length) return achados.sort((a, b) => b.localeCompare(a, "en", { numeric: true }))[0];
+  }
+  throw new Error("nenhum modelo de texto disponível nesta conta");
+}
+// Na hora de ligar: confere cada chave e modelo e deixa tudo no log, para diagnóstico.
+async function iaPreparar() {
+  await Promise.all(PROVEDORES.map(async (p) => {
+    try {
+      const antes = p.modelo;
+      p.modelo = await iaEscolherModelo(p);
+      console.log(`IA ${p.nome}: pronta com o modelo ${p.modelo}${antes && antes !== p.modelo ? ` (o ${antes} não existe mais)` : ""}.`);
+    } catch (e) {
+      if (e.status) iaPausa.set(p.id, { ate: Date.now() + iaDiagnostico(e.status, e.texto).pausa, motivo: e.message });
+      console.error(`IA ${p.nome}: ${e.message}.`);
+    }
+  }));
+}
+
+function iaLimpar(texto) {
+  // Modelos que "pensam em voz alta" mandam o raciocínio junto; só interessa a resposta.
+  return String(texto).replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 async function iaChamar(p, prompt) {
-  const r = await fetch(p.url, {
+  if (!p.modelo) p.modelo = await iaEscolherModelo(p);
+  const corpo = {
+    model: p.modelo, temperature: 0.95, max_tokens: p.maxTokens || 4000,
+    messages: [
+      { role: "system", content: "Você é o Roteirista 40s, roteirista de Reels criativo e fora da caixa. Responda somente com JSON válido, sem nenhum texto antes ou depois." },
+      { role: "user", content: prompt },
+    ],
+    ...(!p.semJson && { response_format: { type: "json_object" } }),
+    ...(/gpt-oss/.test(p.modelo) && { reasoning_effort: "low" }),
+    ...p.extra,
+  };
+  const r = await fetch(`${p.base}/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${p.chave}`, ...(p.id === "openrouter" && { "X-Title": "Roteirista 40s" }) },
-    body: JSON.stringify({ model: p.modelo, temperature: 0.9, max_tokens: 3500, messages: [
-      { role: "system", content: "Você é o Roteirista 40s. Responda somente com JSON válido, sem nenhum texto antes ou depois." },
-      { role: "user", content: prompt },
-    ] }),
-    signal: AbortSignal.timeout(60000),
+    body: JSON.stringify(corpo),
+    signal: AbortSignal.timeout(75000),
   });
   const texto = await r.text();
-  if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}: ${texto.slice(0, 160)}`), { pausa: iaTempoDePausa(r.status, texto, r.headers.get("retry-after")) });
-  let conteudo;
-  try { conteudo = JSON.parse(texto).choices?.[0]?.message?.content; } catch {}
-  if (!conteudo) throw Object.assign(new Error("resposta vazia"), { pausa: 30e3 });
-  return iaExtrairJson(conteudo); // JSON ruim: tenta o próximo provedor, sem pausar este
+  if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}: ${texto.slice(0, 200)}`), { diag: iaDiagnostico(r.status, texto, r.headers.get("retry-after")) });
+  let escolha;
+  try { escolha = JSON.parse(texto).choices?.[0]; } catch {}
+  const conteudo = iaLimpar(escolha?.message?.content || "");
+  if (!conteudo) throw Object.assign(new Error("resposta vazia"), { diag: { motivo: "resposta vazia", pausa: 30e3 } });
+  try { return iaExtrairJson(conteudo); }
+  catch { throw Object.assign(new Error("JSON inválido"), { diag: { motivo: escolha.finish_reason === "length" ? "resposta cortada no meio" : "resposta fora do formato", pausa: 0 } }); }
+}
+// Uma tentativa num provedor, corrigindo sozinho o que dá para corrigir na hora
+// (modelo aposentado, modo JSON não aceito, pedido grande demais) antes de desistir dele.
+async function iaTentar(p, prompt) {
+  for (let ajustes = 0; ; ajustes++) {
+    try { return await iaChamar(p, prompt); }
+    catch (e) {
+      const d = e.diag || { motivo: e.name === "TimeoutError" ? "demorou demais" : "sem conexão", pausa: 45e3 };
+      if (ajustes < 2 && d.semJson && !p.semJson) { p.semJson = true; continue; }
+      if (ajustes < 2 && d.menosTokens && (p.maxTokens || 4000) > 2500) { p.maxTokens = 2500; continue; }
+      if (ajustes < 2 && d.trocarModelo && !p.fixo) {
+        try {
+          const novo = await iaEscolherModelo(p, p.modelo);
+          console.log(`IA ${p.nome}: o modelo ${p.modelo} saiu do ar; trocando para ${novo}.`);
+          p.modelo = novo; continue;
+        } catch {}
+      }
+      throw Object.assign(e, { diag: d });
+    }
+  }
 }
 async function iaGerar(prompt) {
-  const livres = PROVEDORES.filter((p) => !(iaPausa.get(p.id)?.ate > Date.now()));
+  const agora = Date.now();
+  const livres = PROVEDORES.filter((p) => !(iaPausa.get(p.id)?.ate > agora));
+  // Todas em pausa: a que volta primeiro tenta assim mesmo se for só limite por minuto.
+  if (!livres.length) {
+    const prox = [...PROVEDORES].sort((a, b) => iaPausa.get(a.id).ate - iaPausa.get(b.id).ate)[0];
+    if (iaPausa.get(prox.id).ate - agora < 120e3) livres.push(prox);
+  }
   const fila = livres.map((_, i) => livres[(iaVez + i) % livres.length]);
   iaVez++;
   const falhas = [];
   for (const p of fila) {
     try {
-      const resultado = await iaChamar(p, prompt);
+      const resultado = await iaTentar(p, prompt);
       iaPausa.delete(p.id);
       return { resultado, provedor: p.nome };
     } catch (e) {
-      falhas.push(`${p.nome}: ${e.message}`);
-      if (e.pausa) iaPausa.set(p.id, { ate: Date.now() + e.pausa, motivo: e.message.slice(0, 120) });
-      console.error(`IA ${p.nome} falhou (${e.message.slice(0, 120)}); tentando a próxima.`);
+      falhas.push(`${p.nome}: ${e.diag.motivo}`);
+      if (e.diag.pausa) iaPausa.set(p.id, { ate: Date.now() + e.diag.pausa, motivo: e.diag.motivo });
+      console.error(`IA ${p.nome} (${p.modelo}) falhou: ${e.message.slice(0, 200)}. Passando para a próxima.`);
     }
   }
-  throw Object.assign(new Error("Todas as IAs estão no limite agora."), { falhas });
+  for (const p of PROVEDORES) if (!fila.includes(p)) {
+    const pz = iaPausa.get(p.id);
+    falhas.push(`${p.nome}: ${pz.motivo}, volta às ${new Date(pz.ate).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: process.env.TZ || "America/Sao_Paulo" })}`);
+  }
+  throw Object.assign(new Error("Nenhuma IA conseguiu responder agora."), { falhas });
 }
 function iaStatus() {
   return PROVEDORES.map((p) => {
     const pz = iaPausa.get(p.id);
     const pausado = pz?.ate > Date.now();
-    return { nome: p.nome, modelo: p.modelo, disponivel: !pausado, ...(pausado && { volta: new Date(pz.ate).toISOString(), motivo: pz.motivo }) };
+    return { nome: p.nome, modelo: p.modelo || "", disponivel: !pausado, ...(pausado && { volta: new Date(pz.ate).toISOString(), motivo: pz.motivo }) };
   });
 }
+iaPreparar();
 
 // ---- Páginas públicas exigidas pela Meta: privacidade e exclusão de dados ----
 // Ficam abertas (sem login) porque o revisor da Meta e qualquer usuário precisam acessá-las.

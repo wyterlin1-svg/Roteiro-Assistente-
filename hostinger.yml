@@ -29,7 +29,8 @@ services:
       RESPONSAVEL: ""
       CONTATO_EMAIL: ""
       # IAs gratuitas em revezamento (preencha as que tiver; vazias são ignoradas).
-      # Quando uma bate no limite, passa para a próxima; se todas estiverem no limite, usa o motor próprio.
+      # Quando uma bate no limite, passa na hora para a próxima. O modelo de cada uma é escolhido
+      # sozinho (o servidor lista os modelos da conta). O motor próprio só roda se o usuário escolher.
       GEMINI_API_KEY: ""        # aistudio.google.com/apikey
       GROQ_API_KEY: ""          # console.groq.com/keys
       CEREBRAS_API_KEY: ""      # cloud.cerebras.ai
